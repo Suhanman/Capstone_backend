@@ -5,8 +5,10 @@ import com.emailagent.domain.entity.User;
 import com.emailagent.dto.request.calendar.CalendarEventRequest;
 import com.emailagent.dto.response.calendar.CalendarEventDetailResponse;
 import com.emailagent.dto.response.calendar.CalendarEventResponse;
+import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.CalendarEventRepository;
+import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class CalendarService {
 
     private final CalendarEventRepository calendarEventRepository;
     private final UserRepository userRepository;
+    private final IntegrationRepository integrationRepository;
 
     // =============================================
     // GET /api/calendar/events?start_date=&end_date=
@@ -52,6 +55,11 @@ public class CalendarService {
     // =============================================
     @Transactional
     public CalendarEventDetailResponse createEvent(Long userId, CalendarEventRequest request) {
+        // 캘린더 연동 여부 검증 — is_calendar_connected=false 이면 비즈니스 예외
+        integrationRepository.findByUser_UserId(userId)
+                .filter(i -> i.isCalendarConnected())
+                .orElseThrow(CalendarNotConnectedException::new);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
 

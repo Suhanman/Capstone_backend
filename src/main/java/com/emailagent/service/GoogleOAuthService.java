@@ -4,6 +4,7 @@ import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.User;
 import com.emailagent.domain.enums.SyncStatus;
 import com.emailagent.dto.request.auth.IntegrationStatusUpdateRequest;
+import com.emailagent.dto.request.auth.DeleteIntegrationRequest;
 import com.emailagent.dto.response.auth.*;
 import com.emailagent.exception.InsufficientScopeException;
 import com.emailagent.repository.IntegrationRepository;
@@ -31,13 +32,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GoogleOAuthService {
 
-    // 반드시 요청/검증해야 하는 필수 스코프
-    private static final List<String> REQUIRED_SCOPES = Arrays.asList(
+    // Google OAuth 요청 시 포함할 전체 스코프 (Gmail 필수 + Calendar 선택)
+    private static final List<String> REQUEST_SCOPES = Arrays.asList(
             "email",
             "profile",
             "https://www.googleapis.com/auth/gmail.readonly",
             "https://www.googleapis.com/auth/calendar"
     );
+
+    // 콜백 시 반드시 부여되어야 하는 필수 스코프 (없으면 연동 실패 처리)
+    private static final String GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+
+    // 선택 스코프 — 사용자가 거부해도 연동은 성공 (is_calendar_connected=false)
+    private static final String CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
     private final IntegrationRepository integrationRepository;
     private final UserRepository userRepository;
@@ -63,7 +70,7 @@ public class GoogleOAuthService {
     public AuthorizationUrlResponse getAuthorizationUrl(Long userId) {
         String stateJwt = jwtTokenProvider.generateOAuthStateToken(userId);
 
-        String url = new GoogleAuthorizationCodeRequestUrl(clientId, redirectUri, REQUIRED_SCOPES)
+        String url = new GoogleAuthorizationCodeRequestUrl(clientId, redirectUri, REQUEST_SCOPES)
                 .setAccessType("offline")
                 .set("prompt", "consent")
                 .setState(stateJwt)
@@ -75,15 +82,15 @@ public class GoogleOAuthService {
     // ── 2. 콜백 처리 (코드 교환 → 스코프 검증 → DB 저장) ───────────────────────
 
     /**
-     * Google 리다이렉트 콜백 처리.
+     * Google 리다이렉트 콜백 처리 (Granular Consent 적용).
      * 1) state JWT 검증으로 userId 추출 (CSRF 방어)
-     * 2) Authorization Code → Token 교환
-     * 3) 부여된 스코프(Gmail + Calendar) 검증 — 누락 시 InsufficientScopeException
+     * 2) Authorization Code → Access/Refresh Token 교환
+     * 3) 스코프 검증 — Gmail(필수) 누락 시 InsufficientScopeException, Calendar(선택) 누락은 허용
      * 4) id_token 파싱으로 이메일 및 구글 계정 ID 추출
-     * 5) Integrations 테이블 upsert
+     * 5) Integrations 테이블 upsert (is_gmail_connected / is_calendar_connected 저장)
      */
     @Transactional
-    public SuccessResponse handleCallback(String code, String state) throws IOException {
+    public CallbackResponse handleCallback(String code, String state) throws IOException {
         // 1. state JWT 검증 → userId 추출
         Long userId = jwtTokenProvider.getOAuthStateUserId(state);
 
@@ -97,16 +104,16 @@ public class GoogleOAuthService {
                 redirectUri
         ).execute();
 
-        // 3. 부여된 스코프 검증
+        // 3. 스코프 분석 — Gmail은 필수, Calendar는 선택
         String grantedScopesRaw = tokenResponse.getScope();
         List<String> grantedScopes = Arrays.asList(grantedScopesRaw.split(" "));
-        for (String required : List.of(
-                "https://www.googleapis.com/auth/gmail.readonly",
-                "https://www.googleapis.com/auth/calendar")) {
-            if (!grantedScopes.contains(required)) {
-                throw new InsufficientScopeException(
-                        "필수 권한이 누락되었습니다. 다시 동의해 주세요: " + required);
-            }
+
+        boolean isGmailConnected = grantedScopes.contains(GMAIL_SCOPE);
+        boolean isCalendarConnected = grantedScopes.contains(CALENDAR_SCOPE);
+
+        // Gmail scope 미부여 시 연동 자체를 실패 처리
+        if (!isGmailConnected) {
+            throw new InsufficientScopeException("필수 메일 권한이 누락되었습니다. 다시 동의해 주세요.");
         }
 
         // 4. id_token 파싱으로 사용자 정보 추출
@@ -120,6 +127,8 @@ public class GoogleOAuthService {
                 .plusSeconds(tokenResponse.getExpiresInSeconds());
 
         // 6. Integrations upsert (이미 연동됐으면 갱신, 없으면 신규 생성)
+        final boolean gmailFlag = isGmailConnected;
+        final boolean calendarFlag = isCalendarConnected;
         integrationRepository.findByUser_UserId(userId).ifPresentOrElse(
                 existing -> existing.updateTokens(
                         tokenResponse.getAccessToken(),
@@ -127,7 +136,9 @@ public class GoogleOAuthService {
                         tokenExpiresAt,
                         grantedScopesRaw,
                         connectedEmail,
-                        externalAccountId
+                        externalAccountId,
+                        gmailFlag,
+                        calendarFlag
                 ),
                 () -> {
                     User user = userRepository.findById(userId)
@@ -140,6 +151,8 @@ public class GoogleOAuthService {
                             .refreshToken(tokenResponse.getRefreshToken())
                             .tokenExpiresAt(tokenExpiresAt)
                             .grantedScopes(grantedScopesRaw)
+                            .isGmailConnected(gmailFlag)
+                            .isCalendarConnected(calendarFlag)
                             .syncStatus(SyncStatus.CONNECTED)
                             .lastSyncedAt(LocalDateTime.now())
                             .build();
@@ -147,7 +160,7 @@ public class GoogleOAuthService {
                 }
         );
 
-        return new SuccessResponse(true);
+        return new CallbackResponse(isGmailConnected, isCalendarConnected);
     }
 
     // ── 3. 연동 정보 조회 ──────────────────────────────────────────────────────
@@ -170,13 +183,23 @@ public class GoogleOAuthService {
     // ── 5. 연동 해제 ───────────────────────────────────────────────────────────
 
     /**
-     * Integration 레코드 전체 삭제 (토큰 포함 모든 연동 정보 제거)
+     * 연동 해제.
+     * - target_service=ALL: Integration 레코드 전체 삭제 (토큰 포함 모든 연동 정보 제거)
+     * - target_service=CALENDAR: Calendar scope만 비활성화 (토큰 및 Gmail 연동 유지)
      */
     @Transactional
-    public SuccessResponse deleteIntegration(Long userId) {
+    public SuccessResponse deleteIntegration(Long userId, DeleteIntegrationRequest request) {
         Integration integration = findIntegration(userId);
-        integrationRepository.delete(integration);
-        return new SuccessResponse(true);
+
+        if ("CALENDAR".equals(request.getTargetService())) {
+            // 캘린더 단독 해제 — 레코드는 유지, is_calendar_connected=false
+            integration.disconnectCalendar();
+        } else {
+            // ALL — 레코드 전체 삭제
+            integrationRepository.delete(integration);
+        }
+
+        return new SuccessResponse();
     }
 
     // ── 내부 헬퍼 ──────────────────────────────────────────────────────────────

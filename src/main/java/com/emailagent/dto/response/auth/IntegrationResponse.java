@@ -17,6 +17,12 @@ public class IntegrationResponse extends BaseResponse {
     @JsonProperty("sync_status")
     private final String syncStatus;
 
+    @JsonProperty("is_gmail_connected")
+    private final boolean isGmailConnected;
+
+    @JsonProperty("is_calendar_connected")
+    private final boolean isCalendarConnected;
+
     @JsonProperty("last_synced_at")
     private final String lastSyncedAt;
 
@@ -24,6 +30,8 @@ public class IntegrationResponse extends BaseResponse {
         this.provider = integration.getProvider();
         this.connectedEmail = integration.getConnectedEmail();
         this.syncStatus = integration.getSyncStatus().name();
+        this.isGmailConnected = integration.isGmailConnected();
+        this.isCalendarConnected = integration.isCalendarConnected();
         this.lastSyncedAt = integration.getLastSyncedAt() != null
                 ? integration.getLastSyncedAt().toInstant(ZoneOffset.UTC).toString()
                 : null;

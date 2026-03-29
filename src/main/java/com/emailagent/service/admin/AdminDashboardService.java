@@ -1,6 +1,5 @@
 package com.emailagent.service.admin;
 
-import com.emailagent.domain.enums.SyncStatus;
 import com.emailagent.dto.response.admin.dashboard.AdminDashboardSummaryResponse;
 import com.emailagent.dto.response.admin.dashboard.AdminDomainDistributionResponse;
 import com.emailagent.dto.response.admin.dashboard.AdminEmailVolumeResponse;
@@ -46,14 +45,17 @@ public class AdminDashboardService {
         LocalDateTime tomorrowStart = todayStart.plusDays(1);
 
         long totalUsers = userRepository.count();
-        long connectedUsers = integrationRepository.countBySyncStatus(SyncStatus.CONNECTED);
+        // Granular Consent 적용: Gmail(필수) / Calendar(선택) 연동자 수 각각 집계
+        long gmailConnectedUsers = integrationRepository.countByIsGmailConnectedTrue();
+        long calendarConnectedUsers = integrationRepository.countByIsCalendarConnectedTrue();
         long todayAnalyzedEmails = emailAnalysisResultRepository.countByCreatedAtBetween(todayStart, tomorrowStart);
         long todayGeneratedDrafts = draftReplyRepository.countByCreatedAtBetween(todayStart, tomorrowStart);
         long totalSupportTickets = supportTicketRepository.count();
 
         return new AdminDashboardSummaryResponse(
                 totalUsers,
-                connectedUsers,
+                gmailConnectedUsers,
+                calendarConnectedUsers,
                 todayAnalyzedEmails,
                 todayGeneratedDrafts,
                 totalSupportTickets

@@ -16,4 +16,8 @@ public interface IntegrationRepository extends JpaRepository<Integration, Long> 
 
     // 관리자 대시보드: 연동 상태별 사용자 수
     long countBySyncStatus(SyncStatus syncStatus);
+
+    // 관리자 대시보드: Gmail / Calendar 연동 완료 사용자 수 (Granular Consent)
+    long countByIsGmailConnectedTrue();
+    long countByIsCalendarConnectedTrue();
 }

@@ -29,34 +29,45 @@
     - 세밀한 권한 제어(Granular Consent)를 고려해, 토큰 발급 후 필수 Scope(Gmail, Calendar) 누락 여부를 반드시 검증한다.
     - Scope, callback 처리 방식, 상태 변경(status) 의미가 명확하지 않으면 임의로 구현하지 말고 먼저 사용자에게 질문한다.
 
-# API 구현 원칙
+## API 구현 원칙
 1. API Method / URI / 요청·응답 필드명 / 인증 방식은 이미 확정된 API 설계서를 절대 기준으로 한다.
-2. 임의로 URI를 변경하거나 응답 JSON 구조를 바꾸지 않는다.
+2. 임의로 URI를 변경하거나 응답 JSON 구조를 바꾸지 않는다. **(모든 응답은 하단에 정의된 '공통 응답 형식'을 최우선으로 따른다.)**
 3. 없는 스펙은 추측하지 말고 사용자에게 먼저 질문한다.
 4. Controller 매핑만 있고 내부 로직이 비어 있으면 구현 완료로 간주하지 않는다.
 
 # 백엔드 코딩 컨벤션
 1. 계층 분리:
-    - Controller, Service, Repository, DTO 역할을 엄격히 분리한다.
-    - 기본 패키지 구조(`controller`, `service`, `repository`, `domain/entity`, `dto/request`, `dto/response`, `security`, `exception`)를 우선 유지한다.
+   - Controller, Service, Repository, DTO 역할을 엄격히 분리한다.
+   - 기본 패키지 구조(`controller`, `service`, `repository`, `domain/entity`, `dto/request`, `dto/response`, `security`, `exception`)를 우선 유지한다.
 
 2. DB 접근:
-    - 기본 DB 접근 방식은 Spring Data JPA를 사용한다.
-    - 특별한 이유 없이 JdbcTemplate/MyBatis를 임의로 도입하지 않는다.
+   - 기본 DB 접근 방식은 Spring Data JPA를 사용한다.
+   - 특별한 이유 없이 JdbcTemplate/MyBatis를 임의로 도입하지 않는다.
 
-3. 응답 형식:
-    - 응답 형식은 확정된 API 설계서의 필드명과 구조를 절대 우선한다.
-    - 임의의 `success/data`, `code/message/data` 구조를 새로 만들지 않는다.
+3. 공통 응답 형식 (매우 중요 🚨):
+   - 모든 API 응답(성공 및 예외 에러 모두)은 반드시 `BaseResponse`를 상속받아 구현한다.
+   - 모든 응답의 최상위 JSON 구조는 다음 4가지 공통 필드를 필수로 포함해야 한다.
+      1) `content_type`: "application/json" (고정)
+      2) `success`: boolean (성공 시 true, 에러 시 false)
+      3) `result_code`: int (HTTP 상태 코드 사용. 예: 200, 400, 403)
+      4) `result_req`: String (성공 시 빈 문자열 "", 에러 시 구체적 사유 및 내부 에러 코드 명시)
+   - 개별 API의 비즈니스 데이터는 위 공통 필드와 같은 레벨(Flat 구조)에 추가한다. 임의의 중첩된 `data` 객체를 새로 만들지 않는다.
+   - 하위 응답 클래스에서 `success`, `content_type` 등을 중복 선언(Field Shadowing)하여 부모의 필드를 덮어쓰지 않도록 주의한다.
 
 4. 예외 처리:
-    - `try-catch`로 뭉뚱그리지 않고, `@RestControllerAdvice`를 활용한 전역 예외 처리를 지향한다.
+   - `try-catch`로 뭉뚱그리지 않고, `@RestControllerAdvice`를 활용한 전역 예외 처리(`GlobalExceptionHandler`)를 지향한다.
+   - 전역 예외 처리기에서 반환하는 에러 객체(`ApiErrorResponse` 등) 역시 반드시 위의 '공통 응답 형식'을 완벽히 준수하여 반환해야 한다.
 
 5. 주석:
-    - 비즈니스 로직이 복잡한 부분(예: JWT 파싱, OAuth 검증 로직)은 한국어로 동작 과정을 상세히 주석으로 단다.
+   - 비즈니스 로직이 복잡한 부분(예: JWT 파싱, OAuth 검증 로직)은 한국어로 동작 과정을 상세히 주석으로 단다.
 
-6. Lombok:
-    - Lombok annotation processing 이슈 가능성을 고려한다.
-    - 생성자 주입이 중요한 클래스는 필요 시 명시적 생성자를 우선 제안한다.
+6. 명명 규칙 (Naming Convention):
+   - JSON 응답 규격 등 외부로 노출되는 API 필드명은 소문자 기반의 `snake_case`를 엄격히 적용한다.
+   - Java 내부 클래스, 메서드, 변수명은 자바 표준 관례인 `camelCase`를 사용하되, JSON 매핑 시 `@JsonProperty` 등을 활용하여 규격을 맞춘다.
+
+7. Lombok:
+   - Lombok annotation processing 이슈 가능성을 고려한다.
+   - 생성자 주입이 중요한 클래스는 필요 시 명시적 생성자를 우선 제안한다.
 
 # 담당자별 역할 분리
 

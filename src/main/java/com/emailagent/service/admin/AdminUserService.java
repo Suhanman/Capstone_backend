@@ -180,6 +180,6 @@ public class AdminUserService {
             throw new ResourceNotFoundException("해당 사용자의 Google 연동 정보를 찾을 수 없습니다. userId=" + userId);
         }
         integrationRepository.deleteByUser_UserId(userId);
-        return new AdminDeleteIntegrationResponse(true);
+        return new AdminDeleteIntegrationResponse();
     }
 }

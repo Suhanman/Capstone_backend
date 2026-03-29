@@ -291,3 +291,69 @@
 | 4 | Phase 3 (Service) | 비즈니스 로직 핵심 |
 | 5 | Phase 4 (Controller) | 라우팅 연결 |
 | 6 | Phase 5~6 (예외처리/검증) | 마무리 품질 확보 |
+
+---
+
+## 🔀 리팩토링: 부분 연동 (Granular Consent) 적용 (2026-03-28)
+
+> 기준: refactoring_prompt.md
+> 목표: `is_connected` 단일 관리 → Gmail(필수) / Calendar(선택) 세분화
+
+### 수정 대상 파일 및 변경 요약
+
+#### 영역 1: Integrations — Google OAuth 팀 담당
+
+- [x] **`Integration.java`** (Entity)
+  - `is_gmail_connected` boolean 컬럼 추가
+  - `is_calendar_connected` boolean 컬럼 추가
+  - `disconnectCalendar()` 메서드 추가
+  - **DB 마이그레이션**: 완료 (사용자가 직접 실행)
+
+- [x] **`CallbackResponse.java`** (신규 DTO)
+  - `success`, `is_gmail_connected`, `is_calendar_connected` 필드
+
+- [x] **`IntegrationResponse.java`** (DTO 수정)
+  - `is_gmail_connected`, `is_calendar_connected` 필드 추가
+
+- [x] **`DeleteIntegrationRequest.java`** (신규 DTO)
+  - `target_service` 필드 (ALL / CALENDAR)
+
+- [x] **`IntegrationRepository.java`** (Repository 수정)
+  - `countByIsGmailConnectedTrue()` 추가
+  - `countByIsCalendarConnectedTrue()` 추가
+
+- [x] **`GoogleOAuthService.java`** (Service 수정)
+  - `handleCallback()`: Gmail scope 없으면 예외, Calendar scope 없으면 `is_calendar_connected=false`로 저장. 반환 타입 `CallbackResponse`로 변경
+  - `deleteIntegration()`: `targetService` 파라미터 추가. ALL이면 레코드 삭제, CALENDAR면 `disconnectCalendar()`
+
+- [x] **`IntegrationController.java`** (Controller 수정)
+  - `handleCallback()` 반환 타입 `CallbackResponse`
+  - `deleteIntegration()` `@RequestBody DeleteIntegrationRequest` 추가
+
+#### 영역 2: Calendar 서비스 — 서비스 CRUD 팀 담당
+
+- [x] **`CalendarNotConnectedException.java`** (신규 Exception)
+  - 캘린더 권한 없는 사용자 호출 시 발생
+
+- [x] **`GlobalExceptionHandler.java`** (수정)
+  - `CalendarNotConnectedException` 핸들러: HTTP 403 + 새 API 공통 응답 규격 (`ApiErrorResponse` inner record)
+
+- [x] **`CalendarService.java`** (수정)
+  - `createEvent()` 시작 전 `is_calendar_connected` 검증
+
+- [x] **`InboxService.java`** (수정)
+  - `processCalendar()` ADD 액션 전 `is_calendar_connected` 검증
+
+#### 영역 3: 관리자 대시보드 — 서비스 CRUD 팀 담당
+
+- [x] **`AdminDashboardSummaryResponse.java`** (DTO 수정)
+  - `connected_users` → `gmail_connected_users` + `calendar_connected_users` 분리
+
+- [x] **`AdminDashboardService.java`** (Service 수정)
+  - `getSummary()`: 새 Repository 메서드로 각각 집계
+
+### 구현 순서
+1. Entity → Repository → Exception → Handler
+2. Service (GoogleOAuthService) + DTO + Controller (Integrations)
+3. CalendarService + InboxService
+4. AdminDashboardSummaryResponse + AdminDashboardService

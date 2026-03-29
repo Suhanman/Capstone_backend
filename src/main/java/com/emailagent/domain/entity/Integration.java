@@ -48,6 +48,15 @@ public class Integration {
     @Column(name = "granted_scopes", columnDefinition = "TEXT")
     private String grantedScopes;
 
+    // 부분 연동(Granular Consent) — Gmail은 필수, Calendar는 선택
+    @Column(name = "is_gmail_connected", nullable = false)
+    @Builder.Default
+    private boolean isGmailConnected = false;
+
+    @Column(name = "is_calendar_connected", nullable = false)
+    @Builder.Default
+    private boolean isCalendarConnected = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "sync_status", nullable = false)
     @Builder.Default
@@ -67,17 +76,22 @@ public class Integration {
     // ── 비즈니스 메서드 ──────────────────────────────────────────────────────────
 
     /**
-     * Google OAuth 토큰 교환 후 연동 정보 전체 갱신
+     * Google OAuth 토큰 교환 후 연동 정보 전체 갱신 (Granular Consent 적용)
+     * isGmailConnected: Gmail scope 부여 여부 (필수이므로 항상 true로 호출됨)
+     * isCalendarConnected: Calendar scope 부여 여부 (선택, 사용자 거부 시 false)
      */
     public void updateTokens(String accessToken, String refreshToken,
                              LocalDateTime tokenExpiresAt, String grantedScopes,
-                             String connectedEmail, String externalAccountId) {
+                             String connectedEmail, String externalAccountId,
+                             boolean isGmailConnected, boolean isCalendarConnected) {
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.tokenExpiresAt = tokenExpiresAt;
         this.grantedScopes = grantedScopes;
         this.connectedEmail = connectedEmail;
         this.externalAccountId = externalAccountId;
+        this.isGmailConnected = isGmailConnected;
+        this.isCalendarConnected = isCalendarConnected;
         this.syncStatus = SyncStatus.CONNECTED;
         this.lastSyncedAt = LocalDateTime.now();
     }
@@ -87,5 +101,12 @@ public class Integration {
      */
     public void updateSyncStatus(SyncStatus syncStatus) {
         this.syncStatus = syncStatus;
+    }
+
+    /**
+     * Calendar 단독 연동 해제 (토큰은 유지, Calendar scope만 비활성화)
+     */
+    public void disconnectCalendar() {
+        this.isCalendarConnected = false;
     }
 }

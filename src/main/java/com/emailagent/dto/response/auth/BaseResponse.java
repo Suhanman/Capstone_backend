@@ -7,7 +7,9 @@ import lombok.Getter;
 public abstract class BaseResponse {
 
     @JsonProperty("content_type")
-    private final String contentType = "json";
+    private final String contentType = "application/json";
+
+    private final boolean success = true;
 
     @JsonProperty("result_code")
     private final int resultCode = 200;

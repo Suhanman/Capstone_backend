@@ -10,8 +10,11 @@ public class AdminDashboardSummaryResponse extends BaseResponse {
     @JsonProperty("total_users")
     private final long totalUsers;
 
-    @JsonProperty("connected_users")
-    private final long connectedUsers;
+    @JsonProperty("gmail_connected_users")
+    private final long gmailConnectedUsers;
+
+    @JsonProperty("calendar_connected_users")
+    private final long calendarConnectedUsers;
 
     @JsonProperty("today_analyzed_emails")
     private final long todayAnalyzedEmails;
@@ -22,11 +25,13 @@ public class AdminDashboardSummaryResponse extends BaseResponse {
     @JsonProperty("total_support_tickets")
     private final long totalSupportTickets;
 
-    public AdminDashboardSummaryResponse(long totalUsers, long connectedUsers,
+    public AdminDashboardSummaryResponse(long totalUsers, long gmailConnectedUsers,
+                                         long calendarConnectedUsers,
                                          long todayAnalyzedEmails, long todayGeneratedDrafts,
                                          long totalSupportTickets) {
         this.totalUsers = totalUsers;
-        this.connectedUsers = connectedUsers;
+        this.gmailConnectedUsers = gmailConnectedUsers;
+        this.calendarConnectedUsers = calendarConnectedUsers;
         this.todayAnalyzedEmails = todayAnalyzedEmails;
         this.todayGeneratedDrafts = todayGeneratedDrafts;
         this.totalSupportTickets = totalSupportTickets;

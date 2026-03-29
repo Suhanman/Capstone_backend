@@ -1,5 +1,6 @@
 package com.emailagent.controller;
 
+import com.emailagent.dto.request.auth.DeleteIntegrationRequest;
 import com.emailagent.dto.request.auth.IntegrationStatusUpdateRequest;
 import com.emailagent.dto.response.auth.*;
 import com.emailagent.security.CurrentUser;
@@ -30,10 +31,10 @@ public class IntegrationController {
     /**
      * GET /api/integrations/google/callback
      * Google OAuth 콜백 처리 — state JWT로 사용자 식별 (Authorization 헤더 불필요)
-     * 스코프 누락 시 403 반환
+     * Gmail scope 누락 시 403, Calendar scope 누락 시 is_calendar_connected=false로 정상 응답
      */
     @GetMapping("/google/callback")
-    public ResponseEntity<SuccessResponse> handleCallback(
+    public ResponseEntity<CallbackResponse> handleCallback(
             @RequestParam String code,
             @RequestParam String state) throws IOException {
         return ResponseEntity.ok(googleOAuthService.handleCallback(code, state));
@@ -61,10 +62,12 @@ public class IntegrationController {
 
     /**
      * DELETE /api/integrations/me
-     * Google 연동 해제 및 토큰 삭제
+     * target_service=ALL: 전체 연동 해제, target_service=CALENDAR: 캘린더 단독 해제
      */
     @DeleteMapping("/me")
-    public ResponseEntity<SuccessResponse> deleteIntegration(@CurrentUser Long userId) {
-        return ResponseEntity.ok(googleOAuthService.deleteIntegration(userId));
+    public ResponseEntity<SuccessResponse> deleteIntegration(
+            @CurrentUser Long userId,
+            @Valid @RequestBody DeleteIntegrationRequest request) {
+        return ResponseEntity.ok(googleOAuthService.deleteIntegration(userId, request));
     }
 }

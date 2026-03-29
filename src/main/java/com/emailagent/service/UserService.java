@@ -39,7 +39,7 @@ public class UserService {
     public DeleteUserResponse deleteMe(Long userId) {
         User user = findActiveUser(userId);
         user.deactivate();
-        return new DeleteUserResponse(true);
+        return new DeleteUserResponse();
     }
 
     @Transactional(readOnly = true)
@@ -55,7 +55,7 @@ public class UserService {
             throw new BadCredentialsException("현재 비밀번호가 올바르지 않습니다.");
         }
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
-        return new SuccessResponse(true);
+        return new SuccessResponse();
     }
 
     private User findActiveUser(Long userId) {

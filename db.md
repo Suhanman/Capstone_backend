@@ -28,21 +28,24 @@ CREATE TABLE Integrations (
     provider VARCHAR(50) NOT NULL DEFAULT 'GOOGLE', -- 연동 제공자
     connected_email VARCHAR(255) NOT NULL, -- 연동된 Google 이메일
     external_account_id VARCHAR(255) NULL, -- Google 계정 고유 식별자(sub 등)
-
+    
     access_token TEXT, -- Google OAuth access token
     refresh_token TEXT, -- Google OAuth refresh token
     token_expires_at DATETIME NULL, -- Google OAuth access token 만료 시각
-
+    
     granted_scopes TEXT NULL, -- 사용자가 실제로 승인한 Google 권한 목록
+    is_gmail_connected TINYINT(1) NOT NULL DEFAULT 0, -- [추가됨] Gmail 연동 상태 (0: 미연동, 1: 연동)
+    is_calendar_connected TINYINT(1) NOT NULL DEFAULT 0, -- [추가됨] Calendar 연동 상태 (0: 미연동, 1: 연동)
+    
     sync_status ENUM('CONNECTED', 'DISCONNECTED', 'ERROR') NOT NULL DEFAULT 'CONNECTED', -- 현재 Google 연동 상태(정상/해제/오류)
     last_synced_at DATETIME NULL, -- 마지막 동기화 시각
-
+    
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
-
+    
     CONSTRAINT fk_integrations_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
-        ON DELETE CASCADE
+      FOREIGN KEY (user_id) REFERENCES Users(user_id)
+          ON DELETE CASCADE
 );
 ```
 

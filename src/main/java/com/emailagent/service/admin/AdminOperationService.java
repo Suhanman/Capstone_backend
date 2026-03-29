@@ -133,7 +133,7 @@ public class AdminOperationService {
         }
 
         outboxRepository.delete(outbox);
-        return new AdminJobDeleteResponse(true);
+        return new AdminJobDeleteResponse();
     }
 
     // ── private ──────────────────────────────────────────────────────────────

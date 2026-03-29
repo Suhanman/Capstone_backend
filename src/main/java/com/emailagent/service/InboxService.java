@@ -8,6 +8,7 @@ import com.emailagent.dto.request.inbox.ReplyActionRequest;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse.*;
 import com.emailagent.dto.response.inbox.InboxListResponse;
+import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class InboxService {
     private final DraftReplyRepository draftReplyRepository;
     private final CalendarEventRepository calendarEventRepository;
     private final UserRepository userRepository;
+    private final IntegrationRepository integrationRepository;
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
@@ -155,6 +157,11 @@ public class InboxService {
 
         return switch (action) {
             case "ADD" -> {
+                // 캘린더 연동 여부 검증 — is_calendar_connected=false 이면 비즈니스 예외
+                integrationRepository.findByUser_UserId(userId)
+                        .filter(i -> i.isCalendarConnected())
+                        .orElseThrow(CalendarNotConnectedException::new);
+
                 CalendarActionRequest.EventDetails details = request.getEventDetails();
                 if (details == null || details.getTitle() == null) {
                     throw new IllegalArgumentException("ADD 액션은 event_details.title이 필요합니다.");
