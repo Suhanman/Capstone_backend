@@ -1,6 +1,7 @@
 package com.emailagent.dto.response.automation;
 
 import com.emailagent.domain.entity.AutomationRule;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -9,7 +10,7 @@ import java.util.List;
 
 @Getter
 @Builder
-public class AutomationRuleResponse {
+public class AutomationRuleResponse extends BaseResponse {
 
     @JsonProperty("rule_id")
     private Long ruleId;
@@ -43,6 +44,13 @@ public class AutomationRuleResponse {
         private String title;
     }
 
+    /** 목록 응답 래퍼 */
+    @Getter
+    @Builder
+    public static class ListResponse extends BaseResponse {
+        private List<AutomationRuleResponse> data;
+    }
+
     public static AutomationRuleResponse from(AutomationRule rule) {
         TemplateDto templateDto = rule.getTemplate() != null
                 ? TemplateDto.builder()
@@ -63,13 +71,5 @@ public class AutomationRuleResponse {
                 .autoSendEnabled(rule.isAutoSendEnabled())
                 .autoCalendarEnabled(rule.isAutoCalendarEnabled())
                 .build();
-    }
-
-    // 목록 응답 래퍼
-    @Getter
-    @Builder
-    public static class ListResponse {
-        private boolean success;
-        private List<AutomationRuleResponse> data;
     }
 }

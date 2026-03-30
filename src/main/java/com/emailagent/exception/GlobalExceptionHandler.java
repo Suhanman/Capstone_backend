@@ -1,6 +1,6 @@
 package com.emailagent.exception;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.emailagent.dto.response.auth.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,107 +10,75 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleEmailNotFound(EmailNotFoundException e) {
+    public ResponseEntity<BaseResponse> handleEmailNotFound(EmailNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.NOT_FOUND.value(), e.getMessage()));
     }
 
     @ExceptionHandler(TemplateNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleTemplateNotFound(TemplateNotFoundException e) {
+    public ResponseEntity<BaseResponse> handleTemplateNotFound(TemplateNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.NOT_FOUND.value(), e.getMessage()));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException e) {
+    public ResponseEntity<BaseResponse> handleResourceNotFound(ResourceNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.NOT_FOUND.value(), e.getMessage()));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
+    public ResponseEntity<BaseResponse> handleBadCredentials(BadCredentialsException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ErrorResponse.of(HttpStatus.UNAUTHORIZED, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.UNAUTHORIZED.value(), e.getMessage()));
     }
 
     @ExceptionHandler(InsufficientScopeException.class)
-    public ResponseEntity<ErrorResponse> handleInsufficientScope(InsufficientScopeException e) {
+    public ResponseEntity<BaseResponse> handleInsufficientScope(InsufficientScopeException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ErrorResponse.of(HttpStatus.FORBIDDEN, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.FORBIDDEN.value(), e.getMessage()));
     }
 
-    /**
-     * 캘린더 미연동 사용자가 캘린더 API 호출 시 발생.
-     * 새 API 공통 응답 규격(content_type / success / result_code / result_req)으로 응답.
-     */
     @ExceptionHandler(CalendarNotConnectedException.class)
-    public ResponseEntity<ApiErrorResponse> handleCalendarNotConnected(CalendarNotConnectedException e) {
+    public ResponseEntity<BaseResponse> handleCalendarNotConnected(CalendarNotConnectedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ApiErrorResponse(false, HttpStatus.FORBIDDEN.value(), e.getMessage()));
+                .body(new BaseResponse(HttpStatus.FORBIDDEN.value(), e.getMessage()));
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e) {
+    public ResponseEntity<BaseResponse> handleIllegalState(IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ErrorResponse.of(HttpStatus.CONFLICT, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.CONFLICT.value(), e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
+    public ResponseEntity<BaseResponse> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.of(HttpStatus.BAD_REQUEST, e.getMessage()));
+                .body(new BaseResponse(HttpStatus.BAD_REQUEST.value(), e.getMessage()));
     }
 
-    // Validation 오류 (@Valid)
+    // Validation 오류 (@Valid) — 필드별 오류를 result_req에 합쳐서 반환
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
-        Map<String, String> errors = new HashMap<>();
-        for (FieldError fieldError : e.getBindingResult().getFieldErrors()) {
-            errors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
+    public ResponseEntity<BaseResponse> handleValidation(MethodArgumentNotValidException e) {
+        String resultReq = e.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.joining(", "));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.ofValidation(errors));
+                .body(new BaseResponse(HttpStatus.BAD_REQUEST.value(),
+                        "입력값이 올바르지 않습니다: " + resultReq));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneral(Exception e) {
+    public ResponseEntity<BaseResponse> handleGeneral(Exception e) {
         log.error("예상치 못한 오류 발생", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."));
-    }
-
-    // 기존 ErrorResponse (레거시 핸들러 호환 유지)
-    public record ErrorResponse(int status, String message, Object errors, LocalDateTime timestamp) {
-        public static ErrorResponse of(HttpStatus status, String message) {
-            return new ErrorResponse(status.value(), message, null, LocalDateTime.now());
-        }
-
-        public static ErrorResponse ofValidation(Map<String, String> errors) {
-            return new ErrorResponse(400, "입력값이 올바르지 않습니다.", errors, LocalDateTime.now());
-        }
-    }
-
-    /**
-     * 새 API 공통 응답 규격 (2026-03-28 팀 회의 통일)
-     * content_type: "application/json" / success / result_code / result_req
-     */
-    public record ApiErrorResponse(
-            @JsonProperty("content_type") String contentType,
-            boolean success,
-            @JsonProperty("result_code") int resultCode,
-            @JsonProperty("result_req") String resultReq
-    ) {
-        public ApiErrorResponse(boolean success, int resultCode, String resultReq) {
-            this("application/json", success, resultCode, resultReq);
-        }
+                .body(new BaseResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "서버 오류가 발생했습니다."));
     }
 }

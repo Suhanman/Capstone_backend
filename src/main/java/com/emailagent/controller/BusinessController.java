@@ -1,7 +1,7 @@
 package com.emailagent.controller;
 
-import com.emailagent.domain.entity.BusinessProfile;
 import com.emailagent.dto.request.business.*;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.emailagent.dto.response.business.*;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.BusinessService;
@@ -14,8 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/business")
@@ -40,15 +38,10 @@ public class BusinessController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<Map<String, Object>> upsertProfile(
+    public ResponseEntity<ProfileSaveResponse> upsertProfile(
             @CurrentUser Long userId,
             @Valid @RequestBody BusinessProfileRequest request) {
-        BusinessProfile profile = businessService.upsertProfile(userId, request);
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "비즈니스 프로필이 저장되었습니다.",
-                "profile_id", profile.getProfileId()
-        ));
+        return ResponseEntity.ok(businessService.upsertProfile(userId, request));
     }
 
     // =============================================
@@ -59,7 +52,7 @@ public class BusinessController {
     // =============================================
 
     @GetMapping("/resources/files")
-    public ResponseEntity<List<BusinessResourceResponse>> getFiles(@CurrentUser Long userId) {
+    public ResponseEntity<BusinessResourceListResponse> getFiles(@CurrentUser Long userId) {
         return ResponseEntity.ok(businessService.getFiles(userId));
     }
 
@@ -72,11 +65,11 @@ public class BusinessController {
     }
 
     @DeleteMapping("/resources/files/{resourceId}")
-    public ResponseEntity<Void> deleteFile(
+    public ResponseEntity<BaseResponse> deleteFile(
             @CurrentUser Long userId,
             @PathVariable Long resourceId) {
         businessService.deleteFile(userId, resourceId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new BaseResponse());
     }
 
     // =============================================
@@ -88,7 +81,7 @@ public class BusinessController {
     // =============================================
 
     @GetMapping("/resources/faqs")
-    public ResponseEntity<List<FaqResponse>> getFaqs(@CurrentUser Long userId) {
+    public ResponseEntity<FaqListResponse> getFaqs(@CurrentUser Long userId) {
         return ResponseEntity.ok(businessService.getFaqs(userId));
     }
 
@@ -109,11 +102,11 @@ public class BusinessController {
     }
 
     @DeleteMapping("/resources/faqs/{faqId}")
-    public ResponseEntity<Void> deleteFaq(
+    public ResponseEntity<BaseResponse> deleteFaq(
             @CurrentUser Long userId,
             @PathVariable Long faqId) {
         businessService.deleteFaq(userId, faqId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new BaseResponse());
     }
 
     // =============================================
@@ -124,7 +117,7 @@ public class BusinessController {
     // =============================================
 
     @GetMapping("/categories")
-    public ResponseEntity<List<CategoryResponse>> getCategories(@CurrentUser Long userId) {
+    public ResponseEntity<CategoryListResponse> getCategories(@CurrentUser Long userId) {
         return ResponseEntity.ok(businessService.getCategories(userId));
     }
 
@@ -137,11 +130,11 @@ public class BusinessController {
     }
 
     @DeleteMapping("/categories/{categoryId}")
-    public ResponseEntity<Void> deleteCategory(
+    public ResponseEntity<BaseResponse> deleteCategory(
             @CurrentUser Long userId,
             @PathVariable Long categoryId) {
         businessService.deleteCategory(userId, categoryId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new BaseResponse());
     }
 
     // =============================================

@@ -1,5 +1,6 @@
 package com.emailagent.dto.response.dashboard;
 
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -9,9 +10,8 @@ import java.util.List;
 
 @Getter
 @Builder
-public class RecentEmailResponse {
+public class RecentEmailResponse extends BaseResponse {
 
-    private boolean success;
     private List<EmailItem> data;
 
     @Getter

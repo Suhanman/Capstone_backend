@@ -40,7 +40,6 @@ public class AutomationService {
                 .toList();
 
         return AutomationRuleResponse.ListResponse.builder()
-                .success(true)
                 .data(data)
                 .build();
     }

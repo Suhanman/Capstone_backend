@@ -7,7 +7,11 @@
       "Bash(JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-21.0.10\" cd \"E:/USER/Backend_Server\")",
       "Bash(JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-21.0.10\" mvn compile -q)",
       "Bash(export JAVA_HOME=\"/c/Program Files/Java/jdk-21.0.10\")",
-      "Bash(\"$JAVA_HOME/bin/java.exe\" -version)"
+      "Bash(\"$JAVA_HOME/bin/java.exe\" -version)",
+      "Bash(cmd /c \"mvn compile -q 2>&1\")",
+      "Bash(cmd /c \"mvn compile 2>&1\")",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-21.0.4.7-hotspot\" export PATH=\"$JAVA_HOME/bin:$PATH\" cd C:/dev/email-agent)",
+      "Bash(./mvnw.cmd compile:*)"
     ]
   }
 }

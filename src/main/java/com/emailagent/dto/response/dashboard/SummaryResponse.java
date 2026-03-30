@@ -1,32 +1,25 @@
 package com.emailagent.dto.response.dashboard;
 
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
-public class SummaryResponse {
+public class SummaryResponse extends BaseResponse {
 
-    private boolean success;
-    private SummaryData data;
+    @JsonProperty("processed_today")
+    private ProcessedToday processedToday;
 
-    @Getter
-    @Builder
-    public static class SummaryData {
+    @JsonProperty("pending_drafts")
+    private PendingDrafts pendingDrafts;
 
-        @JsonProperty("processed_today")
-        private ProcessedToday processedToday;
+    @JsonProperty("template_matching")
+    private TemplateMatching templateMatching;
 
-        @JsonProperty("pending_drafts")
-        private PendingDrafts pendingDrafts;
-
-        @JsonProperty("template_matching")
-        private TemplateMatching templateMatching;
-
-        @JsonProperty("integration_status")
-        private IntegrationStatus integrationStatus;
-    }
+    @JsonProperty("integration_status")
+    private IntegrationStatus integrationStatus;
 
     @Getter
     @Builder

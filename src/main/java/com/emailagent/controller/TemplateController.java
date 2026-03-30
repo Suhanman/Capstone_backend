@@ -2,6 +2,8 @@ package com.emailagent.controller;
 
 import com.emailagent.dto.request.template.TemplateCreateRequest;
 import com.emailagent.dto.request.template.TemplateUpdateRequest;
+import com.emailagent.dto.response.auth.BaseResponse;
+import com.emailagent.dto.response.template.TemplateListResponse;
 import com.emailagent.dto.response.template.TemplateResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.TemplateService;
@@ -11,8 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/templates")
 @RequiredArgsConstructor
@@ -21,7 +21,7 @@ public class TemplateController {
     private final TemplateService templateService;
 
     @GetMapping
-    public ResponseEntity<List<TemplateResponse>> getTemplates(@CurrentUser Long userId) {
+    public ResponseEntity<TemplateListResponse> getTemplates(@CurrentUser Long userId) {
         return ResponseEntity.ok(templateService.getTemplates(userId));
     }
 
@@ -42,10 +42,10 @@ public class TemplateController {
     }
 
     @DeleteMapping("/{templateId}")
-    public ResponseEntity<Void> deleteTemplate(
+    public ResponseEntity<BaseResponse> deleteTemplate(
             @PathVariable Long templateId,
             @CurrentUser Long userId) {
         templateService.deleteTemplate(templateId, userId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new BaseResponse());
     }
 }

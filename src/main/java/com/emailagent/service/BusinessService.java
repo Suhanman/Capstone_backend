@@ -44,7 +44,7 @@ public class BusinessService {
     }
 
     @Transactional
-    public BusinessProfile upsertProfile(Long userId, BusinessProfileRequest request) {
+    public ProfileSaveResponse upsertProfile(Long userId, BusinessProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
 
@@ -52,7 +52,11 @@ public class BusinessService {
                 .orElse(BusinessProfile.builder().user(user).build());
 
         profile.update(request.getIndustryType(), request.getEmailTone(), request.getCompanyDescription());
-        return profileRepository.save(profile);
+        BusinessProfile saved = profileRepository.save(profile);
+
+        return ProfileSaveResponse.builder()
+                .profileId(saved.getProfileId())
+                .build();
     }
 
     // =============================================
@@ -60,11 +64,13 @@ public class BusinessService {
     // =============================================
 
     @Transactional(readOnly = true)
-    public List<BusinessResourceResponse> getFiles(Long userId) {
-        return resourceRepository.findByUser_UserId(userId)
-                .stream()
-                .map(BusinessResourceResponse::from)
-                .toList();
+    public BusinessResourceListResponse getFiles(Long userId) {
+        return BusinessResourceListResponse.builder()
+                .data(resourceRepository.findByUser_UserId(userId)
+                        .stream()
+                        .map(BusinessResourceResponse::from)
+                        .toList())
+                .build();
     }
 
     @Transactional
@@ -115,11 +121,13 @@ public class BusinessService {
     // =============================================
 
     @Transactional(readOnly = true)
-    public List<FaqResponse> getFaqs(Long userId) {
-        return faqRepository.findByUser_UserId(userId)
-                .stream()
-                .map(FaqResponse::from)
-                .toList();
+    public FaqListResponse getFaqs(Long userId) {
+        return FaqListResponse.builder()
+                .data(faqRepository.findByUser_UserId(userId)
+                        .stream()
+                        .map(FaqResponse::from)
+                        .toList())
+                .build();
     }
 
     @Transactional
@@ -157,11 +165,13 @@ public class BusinessService {
     // =============================================
 
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getCategories(Long userId) {
-        return categoryRepository.findByUser_UserId(userId)
-                .stream()
-                .map(CategoryResponse::from)
-                .toList();
+    public CategoryListResponse getCategories(Long userId) {
+        return CategoryListResponse.builder()
+                .data(categoryRepository.findByUser_UserId(userId)
+                        .stream()
+                        .map(CategoryResponse::from)
+                        .toList())
+                .build();
     }
 
     @Transactional

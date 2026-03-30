@@ -2,6 +2,7 @@ package com.emailagent.controller;
 
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
+import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxListResponse;
 import com.emailagent.security.CurrentUser;
@@ -10,8 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/inbox")
@@ -40,21 +39,19 @@ public class InboxController {
 
     // POST /api/inbox/{email_id}/reply
     @PostMapping("/{emailId}/reply")
-    public ResponseEntity<Map<String, Object>> processReply(
+    public ResponseEntity<InboxActionResponse> processReply(
             @CurrentUser Long userId,
             @PathVariable Long emailId,
             @Valid @RequestBody ReplyActionRequest request) {
-        String message = inboxService.processReply(userId, emailId, request);
-        return ResponseEntity.ok(Map.of("success", true, "message", message));
+        return ResponseEntity.ok(inboxService.processReply(userId, emailId, request));
     }
 
     // POST /api/inbox/{email_id}/calendar
     @PostMapping("/{emailId}/calendar")
-    public ResponseEntity<Map<String, Object>> processCalendar(
+    public ResponseEntity<InboxActionResponse> processCalendar(
             @CurrentUser Long userId,
             @PathVariable Long emailId,
             @Valid @RequestBody CalendarActionRequest request) {
-        String message = inboxService.processCalendar(userId, emailId, request);
-        return ResponseEntity.ok(Map.of("success", true, "message", message));
+        return ResponseEntity.ok(inboxService.processCalendar(userId, emailId, request));
     }
 }

@@ -3,9 +3,8 @@ package com.emailagent.service;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.request.auth.PasswordChangeRequest;
 import com.emailagent.dto.request.auth.UserProfileUpdateRequest;
-import com.emailagent.dto.response.auth.DeleteUserResponse;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.emailagent.dto.response.auth.EmailAvailabilityResponse;
-import com.emailagent.dto.response.auth.SuccessResponse;
 import com.emailagent.dto.response.auth.UserProfileResponse;
 import com.emailagent.dto.response.auth.UserUpdateResponse;
 import com.emailagent.repository.UserRepository;
@@ -36,10 +35,10 @@ public class UserService {
     }
 
     @Transactional
-    public DeleteUserResponse deleteMe(Long userId) {
+    public BaseResponse deleteMe(Long userId) {
         User user = findActiveUser(userId);
         user.deactivate();
-        return new DeleteUserResponse();
+        return new BaseResponse();
     }
 
     @Transactional(readOnly = true)
@@ -49,13 +48,13 @@ public class UserService {
     }
 
     @Transactional
-    public SuccessResponse changePassword(Long userId, PasswordChangeRequest request) {
+    public BaseResponse changePassword(Long userId, PasswordChangeRequest request) {
         User user = findActiveUser(userId);
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new BadCredentialsException("현재 비밀번호가 올바르지 않습니다.");
         }
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
-        return new SuccessResponse();
+        return new BaseResponse();
     }
 
     private User findActiveUser(Long userId) {

@@ -4,7 +4,6 @@ import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.User;
 import com.emailagent.domain.enums.SyncStatus;
 import com.emailagent.dto.request.auth.IntegrationStatusUpdateRequest;
-import com.emailagent.dto.request.auth.DeleteIntegrationRequest;
 import com.emailagent.dto.response.auth.*;
 import com.emailagent.exception.InsufficientScopeException;
 import com.emailagent.repository.IntegrationRepository;
@@ -184,22 +183,13 @@ public class GoogleOAuthService {
 
     /**
      * 연동 해제.
-     * - target_service=ALL: Integration 레코드 전체 삭제 (토큰 포함 모든 연동 정보 제거)
-     * - target_service=CALENDAR: Calendar scope만 비활성화 (토큰 및 Gmail 연동 유지)
+     * Integration 레코드 전체 삭제 (토큰 포함 모든 연동 정보 제거)
      */
     @Transactional
-    public SuccessResponse deleteIntegration(Long userId, DeleteIntegrationRequest request) {
+    public BaseResponse deleteIntegration(Long userId) {
         Integration integration = findIntegration(userId);
-
-        if ("CALENDAR".equals(request.getTargetService())) {
-            // 캘린더 단독 해제 — 레코드는 유지, is_calendar_connected=false
-            integration.disconnectCalendar();
-        } else {
-            // ALL — 레코드 전체 삭제
-            integrationRepository.delete(integration);
-        }
-
-        return new SuccessResponse();
+        integrationRepository.delete(integration);
+        return new BaseResponse();
     }
 
     // ── 내부 헬퍼 ──────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 package com.emailagent.dto.response.support;
 
 import com.emailagent.domain.entity.SupportTicket;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
@@ -11,13 +12,7 @@ import java.util.List;
 
 @Getter
 @Builder
-public class SupportTicketListResponse {
-
-    @JsonProperty("result_code")
-    private final int resultCode = 200;
-
-    @JsonProperty("result_req")
-    private final String resultReq = "";
+public class SupportTicketListResponse extends BaseResponse {
 
     private List<TicketSummary> data;
 

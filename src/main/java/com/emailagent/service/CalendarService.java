@@ -4,6 +4,7 @@ import com.emailagent.domain.entity.CalendarEvent;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.request.calendar.CalendarEventRequest;
 import com.emailagent.dto.response.calendar.CalendarEventDetailResponse;
+import com.emailagent.dto.response.calendar.CalendarEventListResponse;
 import com.emailagent.dto.response.calendar.CalendarEventResponse;
 import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
@@ -16,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -32,11 +32,13 @@ public class CalendarService {
     // 기간 내 일정 목록 조회
     // =============================================
     @Transactional(readOnly = true)
-    public List<CalendarEventResponse> getEvents(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
-        return calendarEventRepository.findByPeriod(userId, startDate, endDate)
-                .stream()
-                .map(CalendarEventResponse::from)
-                .toList();
+    public CalendarEventListResponse getEvents(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
+        return CalendarEventListResponse.builder()
+                .data(calendarEventRepository.findByPeriod(userId, startDate, endDate)
+                        .stream()
+                        .map(CalendarEventResponse::from)
+                        .toList())
+                .build();
     }
 
     // =============================================

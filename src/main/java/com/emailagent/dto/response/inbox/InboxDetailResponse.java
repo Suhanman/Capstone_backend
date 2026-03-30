@@ -1,5 +1,6 @@
 package com.emailagent.dto.response.inbox;
 
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,23 +11,16 @@ import java.util.Map;
 
 @Getter
 @Builder
-public class InboxDetailResponse {
+public class InboxDetailResponse extends BaseResponse {
 
-    private boolean success;
-    private DetailData data;
+    @JsonProperty("email_info")
+    private EmailInfo emailInfo;
 
-    @Getter
-    @Builder
-    public static class DetailData {
-        @JsonProperty("email_info")
-        private EmailInfo emailInfo;
+    @JsonProperty("ai_analysis")
+    private AiAnalysis aiAnalysis;
 
-        @JsonProperty("ai_analysis")
-        private AiAnalysis aiAnalysis;
-
-        @JsonProperty("draft_reply")
-        private DraftReplyInfo draftReply; // 초안 없으면 null
-    }
+    @JsonProperty("draft_reply")
+    private DraftReplyInfo draftReply;
 
     // ── 이메일 원문 ──────────────────────────────
     @Getter
@@ -39,7 +33,7 @@ public class InboxDetailResponse {
         private String senderName;
 
         private String subject;
-        private String body; // body_clean
+        private String body;
 
         @JsonProperty("received_at")
         private LocalDateTime receivedAt;
@@ -52,7 +46,7 @@ public class InboxDetailResponse {
         private String domain;
         private String intent;
         private String summary;
-        private Map<String, Object> entities; // entitiesJson 그대로
+        private Map<String, Object> entities;
     }
 
     // ── 초안 답장 ────────────────────────────────
@@ -65,10 +59,9 @@ public class InboxDetailResponse {
         private String status;
 
         @JsonProperty("template_info")
-        private TemplateInfo templateInfo; // 템플릿 없으면 null
+        private TemplateInfo templateInfo;
 
         private VariableInfo variables;
-
         private String subject;
         private String body;
     }

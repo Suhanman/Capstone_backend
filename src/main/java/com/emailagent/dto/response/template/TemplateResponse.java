@@ -1,6 +1,8 @@
 package com.emailagent.dto.response.template;
 
 import com.emailagent.domain.entity.Template;
+import com.emailagent.dto.response.auth.BaseResponse;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -9,14 +11,29 @@ import java.time.LocalDateTime;
 
 @Getter
 @Builder
-public class TemplateResponse {
+public class TemplateResponse extends BaseResponse {
+
+    @JsonProperty("template_id")
     private Long templateId;
+
+    @JsonProperty("category_id")
     private Long categoryId;
+
+    @JsonProperty("category_name")
     private String categoryName;
+
     private String title;
+
+    @JsonProperty("subject_template")
     private String subjectTemplate;
+
+    @JsonProperty("body_template")
     private String bodyTemplate;
+
+    @JsonProperty("accuracy_score")
     private BigDecimal accuracyScore;
+
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
 
     public static TemplateResponse from(Template template) {

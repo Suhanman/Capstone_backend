@@ -2,6 +2,7 @@ package com.emailagent.dto.response.inbox;
 
 import com.emailagent.domain.entity.Email;
 import com.emailagent.domain.entity.EmailAnalysisResult;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,19 +12,12 @@ import java.util.List;
 
 @Getter
 @Builder
-public class InboxListResponse {
+public class InboxListResponse extends BaseResponse {
 
-    private boolean success;
-    private InboxPage data;
+    @JsonProperty("total_elements")
+    private long totalElements;
 
-    @Getter
-    @Builder
-    public static class InboxPage {
-        @JsonProperty("total_elements")
-        private long totalElements;
-
-        private List<EmailItem> content;
-    }
+    private List<EmailItem> content;
 
     @Getter
     @Builder

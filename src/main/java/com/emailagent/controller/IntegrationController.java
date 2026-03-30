@@ -1,6 +1,5 @@
 package com.emailagent.controller;
 
-import com.emailagent.dto.request.auth.DeleteIntegrationRequest;
 import com.emailagent.dto.request.auth.IntegrationStatusUpdateRequest;
 import com.emailagent.dto.response.auth.*;
 import com.emailagent.security.CurrentUser;
@@ -62,12 +61,10 @@ public class IntegrationController {
 
     /**
      * DELETE /api/integrations/me
-     * target_service=ALL: 전체 연동 해제, target_service=CALENDAR: 캘린더 단독 해제
+     * 전체 Google 연동 해제
      */
     @DeleteMapping("/me")
-    public ResponseEntity<SuccessResponse> deleteIntegration(
-            @CurrentUser Long userId,
-            @Valid @RequestBody DeleteIntegrationRequest request) {
-        return ResponseEntity.ok(googleOAuthService.deleteIntegration(userId, request));
+    public ResponseEntity<BaseResponse> deleteIntegration(@CurrentUser Long userId) {
+        return ResponseEntity.ok(googleOAuthService.deleteIntegration(userId));
     }
 }

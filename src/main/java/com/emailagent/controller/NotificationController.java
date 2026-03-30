@@ -1,5 +1,6 @@
 package com.emailagent.controller;
 
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.emailagent.dto.response.notification.NotificationResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.NotificationService;
@@ -24,7 +25,7 @@ public class NotificationController {
 
     // PATCH /api/notifications/{notification_id}/read
     @PatchMapping("/{notificationId}/read")
-    public ResponseEntity<NotificationResponse.SimpleResponse> markAsRead(
+    public ResponseEntity<BaseResponse> markAsRead(
             @CurrentUser Long userId,
             @PathVariable Long notificationId) {
         return ResponseEntity.ok(notificationService.markAsRead(userId, notificationId));
@@ -32,8 +33,7 @@ public class NotificationController {
 
     // PATCH /api/notifications/read-all
     @PatchMapping("/read-all")
-    public ResponseEntity<NotificationResponse.SimpleResponse> markAllAsRead(
-            @CurrentUser Long userId) {
+    public ResponseEntity<BaseResponse> markAllAsRead(@CurrentUser Long userId) {
         return ResponseEntity.ok(notificationService.markAllAsRead(userId));
     }
 }

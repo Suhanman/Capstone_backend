@@ -3,9 +3,8 @@ package com.emailagent.controller;
 import com.emailagent.dto.request.auth.PasswordChangeRequest;
 import com.emailagent.dto.request.auth.SignupRequest;
 import com.emailagent.dto.request.auth.UserProfileUpdateRequest;
-import com.emailagent.dto.response.auth.DeleteUserResponse;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.emailagent.dto.response.auth.EmailAvailabilityResponse;
-import com.emailagent.dto.response.auth.SuccessResponse;
 import com.emailagent.dto.response.auth.SignupResponse;
 import com.emailagent.dto.response.auth.UserProfileResponse;
 import com.emailagent.dto.response.auth.UserUpdateResponse;
@@ -44,12 +43,12 @@ public class UserController {
     }
 
     @DeleteMapping("/me")
-    public ResponseEntity<DeleteUserResponse> deleteMe(@CurrentUser Long userId) {
+    public ResponseEntity<BaseResponse> deleteMe(@CurrentUser Long userId) {
         return ResponseEntity.ok(userService.deleteMe(userId));
     }
 
     @PatchMapping("/me/password")
-    public ResponseEntity<SuccessResponse> changePassword(
+    public ResponseEntity<BaseResponse> changePassword(
             @CurrentUser Long userId,
             @Valid @RequestBody PasswordChangeRequest request) {
         return ResponseEntity.ok(userService.changePassword(userId, request));

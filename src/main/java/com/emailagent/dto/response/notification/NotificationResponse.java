@@ -1,6 +1,7 @@
 package com.emailagent.dto.response.notification;
 
 import com.emailagent.domain.entity.Notification;
+import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,20 +38,10 @@ public class NotificationResponse {
                 .build();
     }
 
-    // 목록 응답 래퍼
+    /** 목록 응답 래퍼 */
     @Getter
     @Builder
-    public static class ListResponse {
-        private boolean success;
-        private String message;
+    public static class ListResponse extends BaseResponse {
         private List<NotificationResponse> data;
-    }
-
-    // 단순 결과 응답 래퍼
-    @Getter
-    @Builder
-    public static class SimpleResponse {
-        private boolean success;
-        private String message;
     }
 }

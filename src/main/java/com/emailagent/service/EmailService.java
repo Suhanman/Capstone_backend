@@ -5,8 +5,9 @@ import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
 import com.emailagent.domain.enums.EmailStatus;
 import com.emailagent.domain.enums.OutboxStatus;
-import com.emailagent.dto.response.EmailListResponse;
 import com.emailagent.dto.response.EmailDetailResponse;
+import com.emailagent.dto.response.EmailListResponse;
+import com.emailagent.dto.response.EmailPageResponse;
 import com.emailagent.exception.EmailNotFoundException;
 import com.emailagent.messaging.EmailMessagePublisher;
 import com.emailagent.repository.EmailRepository;
@@ -14,7 +15,6 @@ import com.emailagent.repository.OutboxRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,9 +37,15 @@ public class EmailService {
      * 이메일 목록 조회 (페이징)
      */
     @Transactional(readOnly = true)
-    public Page<EmailListResponse> getEmails(Long userId, Pageable pageable) {
-        return emailRepository.findByUser_UserIdOrderByReceivedAtDesc(userId, pageable)
-                .map(EmailListResponse::from);
+    public EmailPageResponse getEmails(Long userId, Pageable pageable) {
+        var page = emailRepository.findByUser_UserIdOrderByReceivedAtDesc(userId, pageable);
+        return EmailPageResponse.builder()
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .number(page.getNumber())
+                .size(page.getSize())
+                .content(page.getContent().stream().map(EmailListResponse::from).toList())
+                .build();
     }
 
     /**

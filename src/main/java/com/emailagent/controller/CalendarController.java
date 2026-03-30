@@ -2,7 +2,7 @@ package com.emailagent.controller;
 
 import com.emailagent.dto.request.calendar.CalendarEventRequest;
 import com.emailagent.dto.response.calendar.CalendarEventDetailResponse;
-import com.emailagent.dto.response.calendar.CalendarEventResponse;
+import com.emailagent.dto.response.calendar.CalendarEventListResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.CalendarService;
 import jakarta.validation.Valid;
@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/calendar")
@@ -24,7 +23,7 @@ public class CalendarController {
 
     // GET /api/calendar/events?start_date=&end_date=
     @GetMapping("/events")
-    public ResponseEntity<List<CalendarEventResponse>> getEvents(
+    public ResponseEntity<CalendarEventListResponse> getEvents(
             @CurrentUser Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start_date,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end_date) {

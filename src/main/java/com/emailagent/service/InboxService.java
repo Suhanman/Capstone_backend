@@ -5,6 +5,7 @@ import com.emailagent.domain.enums.DraftStatus;
 import com.emailagent.domain.enums.EmailStatus;
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
+import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse.*;
 import com.emailagent.dto.response.inbox.InboxListResponse;
@@ -55,11 +56,8 @@ public class InboxService {
                 .toList();
 
         return InboxListResponse.builder()
-                .success(true)
-                .data(InboxListResponse.InboxPage.builder()
-                        .totalElements(emailPage.getTotalElements())
-                        .content(content)
-                        .build())
+                .totalElements(emailPage.getTotalElements())
+                .content(content)
                 .build();
     }
 
@@ -95,12 +93,9 @@ public class InboxService {
                 .orElse(null);
 
         return InboxDetailResponse.builder()
-                .success(true)
-                .data(DetailData.builder()
-                        .emailInfo(emailInfo)
-                        .aiAnalysis(aiAnalysis)
-                        .draftReply(draftReplyInfo)
-                        .build())
+                .emailInfo(emailInfo)
+                .aiAnalysis(aiAnalysis)
+                .draftReply(draftReplyInfo)
                 .build();
     }
 
@@ -109,14 +104,14 @@ public class InboxService {
     // =============================================
 
     @Transactional
-    public String processReply(Long userId, Long emailId, ReplyActionRequest request) {
+    public InboxActionResponse processReply(Long userId, Long emailId, ReplyActionRequest request) {
         Email email = findEmailForUser(emailId, userId);
         DraftReply draft = draftReplyRepository.findByEmailIdAndUserId(emailId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("초안을 찾을 수 없습니다."));
 
         String action = request.getAction().toUpperCase();
 
-        return switch (action) {
+        String message = switch (action) {
             case "SEND" -> {
                 // TODO: Gmail API로 draft.getDraftContent() 발송 (Google OAuth 팀 담당)
                 log.info("[TODO] Gmail 발송 - emailId={}, body={}", emailId, draft.getDraftContent());
@@ -141,6 +136,8 @@ public class InboxService {
             }
             default -> throw new IllegalArgumentException("알 수 없는 action: " + request.getAction());
         };
+
+        return InboxActionResponse.builder().message(message).build();
     }
 
     // =============================================
@@ -148,14 +145,14 @@ public class InboxService {
     // =============================================
 
     @Transactional
-    public String processCalendar(Long userId, Long emailId, CalendarActionRequest request) {
+    public InboxActionResponse processCalendar(Long userId, Long emailId, CalendarActionRequest request) {
         Email email = findEmailForUser(emailId, userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
 
         String action = request.getAction().toUpperCase();
 
-        return switch (action) {
+        String message = switch (action) {
             case "ADD" -> {
                 // 캘린더 연동 여부 검증 — is_calendar_connected=false 이면 비즈니스 예외
                 integrationRepository.findByUser_UserId(userId)
@@ -188,6 +185,8 @@ public class InboxService {
             }
             default -> throw new IllegalArgumentException("알 수 없는 action: " + request.getAction());
         };
+
+        return InboxActionResponse.builder().message(message).build();
     }
 
     // =============================================

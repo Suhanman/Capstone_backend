@@ -60,23 +60,20 @@ public class DashboardService {
         Integration integration = integrationRepository.findByUser_UserId(userId).orElse(null);
 
         return SummaryResponse.builder()
-                .success(true)
-                .data(SummaryResponse.SummaryData.builder()
-                        .processedToday(SummaryResponse.ProcessedToday.builder()
-                                .count(todayCount)
-                                .diffFromYesterday(todayCount - yesterdayCount)
-                                .build())
-                        .pendingDrafts(SummaryResponse.PendingDrafts.builder()
-                                .count(pendingDrafts)
-                                .build())
-                        .templateMatching(SummaryResponse.TemplateMatching.builder()
-                                .rate(round1(thisWeekRate))
-                                .diffFromLastWeek(rateDiff)
-                                .build())
-                        .integrationStatus(SummaryResponse.IntegrationStatus.builder()
-                                .status(integration != null ? integration.getSyncStatus().name() : "DISCONNECTED")
-                                .connectedEmail(integration != null ? integration.getConnectedEmail() : null)
-                                .build())
+                .processedToday(SummaryResponse.ProcessedToday.builder()
+                        .count(todayCount)
+                        .diffFromYesterday(todayCount - yesterdayCount)
+                        .build())
+                .pendingDrafts(SummaryResponse.PendingDrafts.builder()
+                        .count(pendingDrafts)
+                        .build())
+                .templateMatching(SummaryResponse.TemplateMatching.builder()
+                        .rate(round1(thisWeekRate))
+                        .diffFromLastWeek(rateDiff)
+                        .build())
+                .integrationStatus(SummaryResponse.IntegrationStatus.builder()
+                        .status(integration != null ? integration.getSyncStatus().name() : "DISCONNECTED")
+                        .connectedEmail(integration != null ? integration.getConnectedEmail() : null)
                         .build())
                 .build();
     }
@@ -95,7 +92,6 @@ public class DashboardService {
                 .toList();
 
         return ScheduleResponse.builder()
-                .success(true)
                 .data(items)
                 .build();
     }
@@ -123,14 +119,11 @@ public class DashboardService {
                 .toList();
 
         return WeeklySummaryResponse.builder()
-                .success(true)
-                .data(WeeklySummaryResponse.WeeklyData.builder()
-                        .dateRange(WeeklySummaryResponse.DateRange.builder()
-                                .start(monday.format(DATE_FMT))
-                                .end(monday.plusDays(6).format(DATE_FMT)) // 일요일
-                                .build())
-                        .categories(categories)
+                .dateRange(WeeklySummaryResponse.DateRange.builder()
+                        .start(monday.format(DATE_FMT))
+                        .end(monday.plusDays(6).format(DATE_FMT)) // 일요일
                         .build())
+                .categories(categories)
                 .build();
     }
 
@@ -171,7 +164,6 @@ public class DashboardService {
                 .toList();
 
         return RecentEmailResponse.builder()
-                .success(true)
                 .data(items)
                 .build();
     }

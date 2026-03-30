@@ -5,6 +5,7 @@ import com.emailagent.domain.entity.Template;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.request.template.TemplateCreateRequest;
 import com.emailagent.dto.request.template.TemplateUpdateRequest;
+import com.emailagent.dto.response.template.TemplateListResponse;
 import com.emailagent.dto.response.template.TemplateResponse;
 import com.emailagent.exception.TemplateNotFoundException;
 import com.emailagent.repository.CategoryRepository;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,11 +28,13 @@ public class TemplateService {
     private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
-    public List<TemplateResponse> getTemplates(Long userId) {
-        return templateRepository.findByUser_UserId(userId)
-                .stream()
-                .map(TemplateResponse::from)
-                .toList();
+    public TemplateListResponse getTemplates(Long userId) {
+        return TemplateListResponse.builder()
+                .data(templateRepository.findByUser_UserId(userId)
+                        .stream()
+                        .map(TemplateResponse::from)
+                        .toList())
+                .build();
     }
 
     @Transactional
