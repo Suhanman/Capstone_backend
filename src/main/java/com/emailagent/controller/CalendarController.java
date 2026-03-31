@@ -1,6 +1,7 @@
 package com.emailagent.controller;
 
 import com.emailagent.dto.request.calendar.CalendarEventRequest;
+import com.emailagent.dto.response.calendar.CalendarDeleteResponse;
 import com.emailagent.dto.response.calendar.CalendarEventDetailResponse;
 import com.emailagent.dto.response.calendar.CalendarEventListResponse;
 import com.emailagent.security.CurrentUser;
@@ -62,5 +63,14 @@ public class CalendarController {
             @PathVariable Long eventId,
             @Valid @RequestBody CalendarEventRequest request) {
         return ResponseEntity.ok(calendarService.updateEvent(userId, eventId, request));
+    }
+
+    // DELETE /api/calendar/events/{event_id}
+    @DeleteMapping("/events/{eventId}")
+    public ResponseEntity<CalendarDeleteResponse> deleteEvent(
+            @CurrentUser Long userId,
+            @PathVariable Long eventId) {
+        calendarService.deleteEvent(userId, eventId);
+        return ResponseEntity.ok(CalendarDeleteResponse.OK);
     }
 }

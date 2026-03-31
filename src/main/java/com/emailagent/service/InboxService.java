@@ -14,12 +14,17 @@ import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +40,7 @@ public class InboxService {
     private final CalendarEventRepository calendarEventRepository;
     private final UserRepository userRepository;
     private final IntegrationRepository integrationRepository;
+    private final EmailAttachmentRepository emailAttachmentRepository;
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
@@ -187,6 +193,39 @@ public class InboxService {
         };
 
         return InboxActionResponse.builder().message(message).build();
+    }
+
+    // =============================================
+    // GET /api/inbox/{email_id}/attachments/{attachment_id}
+    // 첨부파일 다운로드
+    // =============================================
+
+    @Transactional(readOnly = true)
+    public Resource downloadAttachment(Long userId, Long emailId, Long attachmentId) {
+        // 1. 이메일 조회 — userId로 본인 소유 여부 검증
+        findEmailForUser(emailId, userId);
+
+        // 2. 첨부파일 조회 — email_id와 attachment_id 조합으로 归속 검증
+        EmailAttachment attachment = emailAttachmentRepository
+                .findByAttachmentIdAndEmail_EmailId(attachmentId, emailId)
+                .orElseThrow(() -> new ResourceNotFoundException("첨부파일을 찾을 수 없습니다."));
+
+        // TODO: Gmail API를 통한 실제 첨부파일 다운로드 (Google OAuth 팀 담당)
+        //       attachment.getExternalAttachmentId() 를 사용하여 Gmail API 호출 후 바이트 반환
+        log.info("[TODO] Gmail 첨부파일 다운로드 - emailId={}, attachmentId={}, externalId={}",
+                emailId, attachmentId, attachment.getExternalAttachmentId());
+
+        // 3. 로컬 저장 경로 기준 Resource 반환
+        try {
+            Path filePath = Paths.get(attachment.getFilePath()).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new ResourceNotFoundException("첨부파일을 읽을 수 없습니다.");
+            }
+            return resource;
+        } catch (MalformedURLException e) {
+            throw new ResourceNotFoundException("첨부파일 경로가 올바르지 않습니다.");
+        }
     }
 
     // =============================================

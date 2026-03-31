@@ -9,6 +9,9 @@ import com.emailagent.security.CurrentUser;
 import com.emailagent.service.InboxService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,6 +47,24 @@ public class InboxController {
             @PathVariable Long emailId,
             @Valid @RequestBody ReplyActionRequest request) {
         return ResponseEntity.ok(inboxService.processReply(userId, emailId, request));
+    }
+
+    // GET /api/inbox/{email_id}/attachments/{attachment_id}
+    @GetMapping("/{emailId}/attachments/{attachmentId}")
+    public ResponseEntity<Resource> downloadAttachment(
+            @CurrentUser Long userId,
+            @PathVariable Long emailId,
+            @PathVariable Long attachmentId) {
+        Resource resource = inboxService.downloadAttachment(userId, emailId, attachmentId);
+
+        // 파일명과 MIME 타입은 Resource의 메타정보를 활용
+        // (실제 운영에서는 DB의 fileName/mimeType 기반으로 헤더 구성)
+        String filename = resource.getFilename() != null ? resource.getFilename() : "attachment";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .body(resource);
     }
 
     // POST /api/inbox/{email_id}/calendar

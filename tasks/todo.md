@@ -17,7 +17,7 @@
 
 ### Phase 2: 비즈니스 DTO 리팩토링 ✅
 - [x] BusinessProfileResponse — Flat, extends BaseResponse
-- [x] BusinessResourceResponse — extends BaseResponse
+- [x] BusinessResourceResponse — extends BaseResponse1
 - [x] FaqResponse — extends BaseResponse
 - [x] CategoryResponse — extends BaseResponse
 - [x] TemplateRegenerateResponse — 플래튼화, extends BaseResponse

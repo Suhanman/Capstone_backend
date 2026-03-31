@@ -120,6 +120,23 @@ public class CalendarService {
     }
 
     // =============================================
+    // DELETE /api/calendar/events/{event_id}
+    // 일정 삭제
+    // =============================================
+    @Transactional
+    public void deleteEvent(Long userId, Long eventId) {
+        CalendarEvent event = findEventForUser(eventId, userId);
+
+        // isCalendarAdded=true인 경우 Google Calendar에서도 삭제 필요
+        if (event.isCalendarAdded()) {
+            // TODO: Google Calendar API로 실제 일정 삭제 (Google OAuth 팀 담당)
+            log.info("[TODO] Google Calendar 삭제 - eventId={}, title={}", event.getEventId(), event.getTitle());
+        }
+
+        calendarEventRepository.delete(event);
+    }
+
+    // =============================================
     // 내부 헬퍼: 소유권 검증 포함 단건 조회
     // =============================================
     private CalendarEvent findEventForUser(Long eventId, Long userId) {
