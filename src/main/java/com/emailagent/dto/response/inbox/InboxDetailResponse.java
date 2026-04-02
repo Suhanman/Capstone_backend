@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,12 @@ public class InboxDetailResponse extends BaseResponse {
         private String intent;
         private String summary;
         private Map<String, Object> entities;
+
+        @JsonProperty("confidence_score")
+        private BigDecimal confidenceScore;
+
+        @JsonProperty("schedule_detected")
+        private Boolean scheduleDetected;
     }
 
     // ── 초안 답장 ────────────────────────────────

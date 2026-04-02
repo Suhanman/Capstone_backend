@@ -7,22 +7,18 @@ import lombok.Getter;
 import java.util.List;
 
 /**
- * GET /api/emails/{emailId}/recommendations 응답 DTO
+ * GET /api/inbox/{emailId}/recommendations 응답 DTO
  * BaseResponse(Flat 구조)에 추천 초안 목록 포함
  */
 @Getter
 public class RecommendedDraftResponse extends BaseResponse {
 
-    @JsonProperty("email_id")
-    private final Long emailId;
+    @JsonProperty("data")
+    private final List<DraftItem> data;
 
-    @JsonProperty("recommendations")
-    private final List<DraftItem> recommendations;
-
-    public RecommendedDraftResponse(Long emailId, List<DraftItem> recommendations) {
+    public RecommendedDraftResponse(List<DraftItem> data) {
         super();
-        this.emailId = emailId;
-        this.recommendations = recommendations;
+        this.data = data;
     }
 
     @Getter

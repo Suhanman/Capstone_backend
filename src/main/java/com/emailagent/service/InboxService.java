@@ -4,13 +4,16 @@ import com.emailagent.domain.entity.*;
 import com.emailagent.domain.enums.DraftStatus;
 import com.emailagent.domain.enums.EmailStatus;
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
+import com.emailagent.dto.request.inbox.RegenerateRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
 import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse.*;
 import com.emailagent.dto.response.inbox.InboxListResponse;
+import com.emailagent.dto.response.inbox.RegenerateResponse;
 import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
+import com.emailagent.messaging.EmailMessagePublisher;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +44,10 @@ public class InboxService {
     private final UserRepository userRepository;
     private final IntegrationRepository integrationRepository;
     private final EmailAttachmentRepository emailAttachmentRepository;
+    private final EmailAnalysisResultRepository emailAnalysisResultRepository;
+    private final BusinessProfileRepository businessProfileRepository;
+    private final EmailMessagePublisher emailMessagePublisher;
+    private final BusinessService businessService;
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
@@ -91,6 +98,8 @@ public class InboxService {
                 .intent(ar.getIntent())
                 .summary(ar.getSummaryText())
                 .entities(ar.getEntitiesJson())
+                .confidenceScore(ar.getConfidenceScore())
+                .scheduleDetected(ar.isScheduleDetected())
                 .build() : null;
 
         DraftReplyInfo draftReplyInfo = draftReplyRepository
@@ -103,6 +112,48 @@ public class InboxService {
                 .aiAnalysis(aiAnalysis)
                 .draftReply(draftReplyInfo)
                 .build();
+    }
+
+    // =============================================
+    // POST /api/inbox/{email_id}/regenerate
+    // =============================================
+
+    @Transactional
+    public RegenerateResponse regenerate(Long userId, Long emailId, RegenerateRequest request) {
+        // 1. emailId로 Email 조회 (본인 소유 검증)
+        Email email = findEmailForUser(emailId, userId);
+
+        // 2. EmailAnalysisResults에서 domain, intent, summary 조회
+        EmailAnalysisResult ar = emailAnalysisResultRepository.findByEmail_EmailId(emailId)
+                .orElseThrow(() -> new ResourceNotFoundException("이메일 분석 결과를 찾을 수 없습니다."));
+
+        // 3. RAG context 생성
+        String ragContext = businessService.buildRagContext(userId);
+
+        // 4. BusinessProfile에서 emailTone 조회
+        String emailTone = businessProfileRepository.findByUser_UserId(userId)
+                .map(p -> p.getEmailTone().name())
+                .orElse(null);
+
+        // 5. email.draft 큐로 재생성 요청 발행 (mode="regenerate")
+        emailMessagePublisher.publishDraftRequest(
+                emailId,
+                email.getSubject(),
+                email.getBodyClean(),
+                ar.getDomain(),
+                ar.getIntent(),
+                ar.getSummaryText(),
+                emailTone,
+                ragContext,
+                request.getPreviousDraft(),
+                "regenerate"
+        );
+
+        // 6. DraftReply status → PENDING_REVIEW로 초기화
+        draftReplyRepository.findByEmailIdAndUserId(emailId, userId)
+                .ifPresent(draft -> draft.updateStatus(DraftStatus.PENDING_REVIEW));
+
+        return new RegenerateResponse("답장 재생성 요청이 접수되었습니다.");
     }
 
     // =============================================

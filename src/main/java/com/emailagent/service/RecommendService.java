@@ -25,9 +25,10 @@ public class RecommendService {
     /**
      * emailId의 email_embedding을 기준으로 reply_embedding과 코사인 유사도가 높은 초안 topK개 반환
      * 1. emailId로 EmailAnalysisResult 조회 → email_embedding(float[]) 획득
-     * 2. float[] → byte[] 변환 (MariaDB VEC_DISTANCE_COSINE 파라미터)
-     * 3. 네이티브 쿼리로 유사도 상위 topK 초안 조회
-     * 4. RecommendedDraftResponse로 변환
+     * 2. email_embedding null이면 빈 배열 반환
+     * 3. float[] → byte[] 변환 (MariaDB VEC_DISTANCE_COSINE 파라미터)
+     * 4. 네이티브 쿼리로 유사도 상위 topK 초안 조회
+     * 5. RecommendedDraftResponse로 변환
      */
     @Transactional(readOnly = true)
     public RecommendedDraftResponse recommendSimilarDrafts(Long emailId, int topK) {
@@ -38,18 +39,20 @@ public class RecommendService {
                         "이메일 분석 결과를 찾을 수 없습니다: emailId=" + emailId));
 
         float[] emailEmbedding = analysisResult.getEmailEmbedding();
+
+        // 2. email_embedding이 없으면 빈 배열 반환
         if (emailEmbedding == null) {
             log.warn("email_embedding이 없습니다: emailId={}", emailId);
-            return new RecommendedDraftResponse(emailId, List.of());
+            return new RecommendedDraftResponse(List.of());
         }
 
-        // 2. float[] → byte[] 변환 (VectorConverter 활용)
+        // 3. float[] → byte[] 변환 (VectorConverter 활용)
         byte[] embeddingBytes = vectorConverter.convertToDatabaseColumn(emailEmbedding);
 
-        // 3. 유사도 상위 topK 초안 조회
+        // 4. 유사도 상위 topK 초안 조회
         List<Object[]> rows = draftReplyRepository.findTopKSimilarDrafts(embeddingBytes, topK);
 
-        // 4. 결과를 DraftItem 목록으로 변환
+        // 5. 결과를 DraftItem 목록으로 변환
         List<RecommendedDraftResponse.DraftItem> items = rows.stream()
                 .map(row -> new RecommendedDraftResponse.DraftItem(
                         ((Number) row[0]).longValue(),   // draft_reply_id
@@ -61,6 +64,6 @@ public class RecommendService {
                 .toList();
 
         log.info("유사 초안 추천 완료: emailId={}, 결과 수={}", emailId, items.size());
-        return new RecommendedDraftResponse(emailId, items);
+        return new RecommendedDraftResponse(items);
     }
 }

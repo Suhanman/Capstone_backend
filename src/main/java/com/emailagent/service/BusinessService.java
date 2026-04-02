@@ -201,6 +201,37 @@ public class BusinessService {
     }
 
     // =============================================
+    // RAG Context 생성
+    // =============================================
+
+    /**
+     * userId의 비즈니스 프로필(회사 소개)과 FAQ를 조합하여 RAG context 문자열 반환.
+     * 초안 생성/재생성 요청 시 AI 서버에 전달하는 컨텍스트로 활용된다.
+     */
+    @Transactional(readOnly = true)
+    public String buildRagContext(Long userId) {
+        StringBuilder sb = new StringBuilder();
+
+        // 회사 소개 추가
+        profileRepository.findByUser_UserId(userId).ifPresent(profile -> {
+            if (profile.getCompanyDescription() != null && !profile.getCompanyDescription().isBlank()) {
+                sb.append("[회사 소개]\n").append(profile.getCompanyDescription()).append("\n\n");
+            }
+        });
+
+        // FAQ 목록 추가
+        List<BusinessFaq> faqs = faqRepository.findByUser_UserId(userId);
+        if (!faqs.isEmpty()) {
+            sb.append("[자주 묻는 질문]\n");
+            faqs.forEach(faq ->
+                    sb.append("Q: ").append(faq.getQuestion())
+                      .append("\nA: ").append(faq.getAnswer()).append("\n"));
+        }
+
+        return sb.toString().trim();
+    }
+
+    // =============================================
     // 템플릿 재생성
     // =============================================
 
