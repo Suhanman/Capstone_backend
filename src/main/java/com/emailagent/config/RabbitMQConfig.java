@@ -11,20 +11,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
+    // 큐/라우팅 키 상수 (Consumer 어노테이션에서 참조)
+    public static final String CLASSIFY_QUEUE = "email.classify";
+    public static final String DRAFT_QUEUE = "email.draft";
+    public static final String CLASSIFY_ROUTING_KEY = "email.classify";
+    public static final String DRAFT_ROUTING_KEY = "email.draft";
+
     @Value("${app.rabbitmq.exchange}")
     private String exchange;
-
-    @Value("${app.rabbitmq.queue.request}")
-    private String requestQueue;
-
-    @Value("${app.rabbitmq.queue.response}")
-    private String responseQueue;
-
-    @Value("${app.rabbitmq.routing-key.request}")
-    private String requestRoutingKey;
-
-    @Value("${app.rabbitmq.routing-key.response}")
-    private String responseRoutingKey;
 
     @Bean
     public TopicExchange emailExchange() {
@@ -32,27 +26,27 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue emailRequestQueue() {
-        return QueueBuilder.durable(requestQueue).build();
+    public Queue classifyQueue() {
+        return QueueBuilder.durable(CLASSIFY_QUEUE).build();
     }
 
     @Bean
-    public Queue emailResponseQueue() {
-        return QueueBuilder.durable(responseQueue).build();
+    public Queue draftQueue() {
+        return QueueBuilder.durable(DRAFT_QUEUE).build();
     }
 
     @Bean
-    public Binding requestBinding() {
-        return BindingBuilder.bind(emailRequestQueue())
+    public Binding classifyBinding() {
+        return BindingBuilder.bind(classifyQueue())
                 .to(emailExchange())
-                .with(requestRoutingKey);
+                .with(CLASSIFY_ROUTING_KEY);
     }
 
     @Bean
-    public Binding responseBinding() {
-        return BindingBuilder.bind(emailResponseQueue())
+    public Binding draftBinding() {
+        return BindingBuilder.bind(draftQueue())
                 .to(emailExchange())
-                .with(responseRoutingKey);
+                .with(DRAFT_ROUTING_KEY);
     }
 
     // JSON 직렬화 컨버터

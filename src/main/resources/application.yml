@@ -30,11 +30,11 @@ app:
   rabbitmq:
     exchange: email.exchange
     queue:
-      request: email.request.queue
-      response: email.response.queue
+      classify: email.classify
+      draft: email.draft
     routing-key:
-      request: email.request
-      response: email.response
+      classify: email.classify
+      draft: email.draft
 
   ai:
     server-url: ${AI_SERVER_URL:http://localhost:8000}

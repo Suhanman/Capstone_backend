@@ -1,17 +1,14 @@
 package com.emailagent.service;
 
 import com.emailagent.domain.entity.Email;
-import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
 import com.emailagent.domain.enums.EmailStatus;
-import com.emailagent.domain.enums.OutboxStatus;
 import com.emailagent.dto.response.EmailDetailResponse;
 import com.emailagent.dto.response.EmailListResponse;
 import com.emailagent.dto.response.EmailPageResponse;
 import com.emailagent.exception.EmailNotFoundException;
 import com.emailagent.messaging.EmailMessagePublisher;
 import com.emailagent.repository.EmailRepository;
-import com.emailagent.repository.OutboxRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -29,7 +24,6 @@ import java.util.Map;
 public class EmailService {
 
     private final EmailRepository emailRepository;
-    private final OutboxRepository outboxRepository;
     private final UserRepository userRepository;
     private final EmailMessagePublisher messagePublisher;
 
@@ -90,21 +84,9 @@ public class EmailService {
                 .build();
         email = emailRepository.save(email);
 
-        // 2. Outbox 패턴: AI 처리 요청 큐잉
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("email_id", email.getEmailId());
-        payload.put("user_id", userId);
-        payload.put("body_clean", bodyClean);
-        payload.put("subject", subject);
-
-        Outbox outbox = Outbox.builder()
-                .email(email)
-                .payload(payload)
-                .build();
-        outboxRepository.save(outbox);
-
-        // 3. RabbitMQ로 AI 서버에 분석 요청 발행
-        messagePublisher.publishEmailAnalysisRequest(outbox.getOutboxId(), payload);
+        // 2. RabbitMQ로 AI 서버에 분류 요청 발행
+        // mailTone, ragContext는 이 단계에서 미확정 → EmailClassifyConsumer 처리 후 publishDraftRequest로 전달
+        messagePublisher.publishClassifyRequest(email.getEmailId(), subject, bodyClean, null, null);
 
         log.info("새 이메일 처리 시작: emailId={}, externalMsgId={}", email.getEmailId(), externalMsgId);
     }

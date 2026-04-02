@@ -1,5 +1,6 @@
 package com.emailagent.domain.entity;
 
+import com.emailagent.converter.VectorConverter;
 import com.emailagent.domain.enums.DraftStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -44,6 +45,11 @@ public class DraftReply {
     @Column(name = "draft_content", columnDefinition = "TEXT")
     private String draftContent;
 
+    // AI가 생성한 답장 임베딩 벡터 (MariaDB VECTOR(384) 바이너리)
+    @Column(name = "reply_embedding")
+    @Convert(converter = VectorConverter.class)
+    private float[] replyEmbedding;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -54,5 +60,15 @@ public class DraftReply {
 
     public void updateStatus(DraftStatus status) {
         this.status = status;
+    }
+
+    /**
+     * draft 큐 AI 결과 수신 후 내용 갱신
+     * replyEmbedding: float[] (MariaDB VECTOR(384) 바이너리로 저장)
+     */
+    public void updateContent(String draftSubject, String draftContent, float[] replyEmbedding) {
+        this.draftSubject = draftSubject;
+        this.draftContent = draftContent;
+        this.replyEmbedding = replyEmbedding;
     }
 }

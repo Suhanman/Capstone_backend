@@ -78,3 +78,76 @@
 - 빌드: BUILD SUCCESS (178 source files)
 - 경고: EmailAnalysisConsumer.java unchecked operations (기존 코드, 본 작업 범위 외)
 - 모든 API 응답이 BaseResponse 공통 형식으로 통일됨
+
+---
+
+# RabbitMQ 큐 분리 및 메시징 파트 구현
+
+## 목표
+classify / draft 2-큐 구조로 분리하여 AI 파이프라인 연동 구축
+
+## 체크리스트
+
+### Phase 1: 큐 설정 분리 ✅
+- [x] application.yml — queue.request/response → queue.classify/draft 교체
+- [x] RabbitMQConfig.java — CLASSIFY_QUEUE, DRAFT_QUEUE 상수 + 빈 등록 (기존 request/response 제거)
+
+### Phase 2: 엔티티 확장 ✅
+- [x] EmailAnalysisResult.java — emailEmbedding TEXT 컬럼 추가, updateFromClassify() 메서드 추가
+- [x] DraftReply.java — replyEmbedding TEXT 컬럼 추가, updateContent() 메서드 추가
+- [x] DraftReplyRepository.java — findByEmail_EmailId() 추가
+
+### Phase 3: Publisher 교체 ✅
+- [x] EmailMessagePublisher.java — publishEmailAnalysisRequest() 제거
+  → publishClassifyRequest() + publishDraftRequest() 2개로 분리
+  → OutboxRepository 의존성 제거
+
+### Phase 4: Consumer 구현 ✅
+- [x] EmailAnalysisConsumer.java — 구 단일 컨슈머 스텁으로 대체 (@deprecated)
+- [x] EmailClassifyConsumer.java — 신규 생성 (classify 결과 수신 → CalendarEvent 저장 → publishDraftRequest 연결)
+- [x] EmailDraftConsumer.java — 신규 생성 (draft 결과 수신 → DraftReply 저장 → Email status 갱신)
+
+### Phase 5: 연계 서비스 수정 ✅
+- [x] EmailService.java — publishEmailAnalysisRequest() → publishClassifyRequest() 교체, Outbox 관련 코드 정리
+
+### Phase 6: 빌드 확인 ✅
+- [x] mvn compile 성공 (183개 파일, 오류 없음)
+
+## 최종 결과
+- 완료: 2026-04-02
+- 빌드: BUILD SUCCESS (183 source files)
+- embedding 필드: 2세션에서 VECTOR 타입으로 전환 예정 (현재 JSON TEXT로 저장)
+
+---
+
+# VECTOR 타입 매핑 및 유사도 추천 파트 구현
+
+## 목표
+embedding 필드를 MariaDB VECTOR(384) 바이너리로 전환하고, 코사인 유사도 기반 초안 추천 API 구현
+
+## 체크리스트
+
+### Phase 1: VectorConverter 구현 ✅
+- [x] converter/VectorConverter.java — float[] ↔ byte[] (little-endian, 4bytes/float), @Component + @Converter
+
+### Phase 2: 엔티티 전환 ✅
+- [x] EmailAnalysisResult.java — emailEmbedding TEXT → float[] (@Convert VectorConverter), summary 필드 추가, updateFromClassify() 시그니처 변경
+- [x] DraftReply.java — replyEmbedding TEXT → float[] (@Convert VectorConverter), updateContent() 시그니처 변경
+
+### Phase 3: Consumer 수정 ✅
+- [x] EmailClassifyConsumer.java — JSON 직렬화 제거, List<Number> → float[] 변환 후 직접 저장, ObjectMapper 의존성 제거
+- [x] EmailDraftConsumer.java — JSON 직렬화 제거, List<Number> → float[] 변환 후 직접 저장, ObjectMapper 의존성 제거
+
+### Phase 4: 추천 기능 구현 ✅
+- [x] DraftReplyRepository.java — findTopKSimilarDrafts() 네이티브 쿼리 추가 (VEC_DISTANCE_COSINE)
+- [x] dto/response/recommend/RecommendedDraftResponse.java — BaseResponse Flat 구조, DraftItem 내부 클래스
+- [x] service/RecommendService.java — recommendSimilarDrafts(emailId, topK) 구현
+- [x] controller/RecommendController.java — GET /api/emails/{emailId}/recommendations?topK=3
+
+### Phase 5: 빌드 확인 ✅
+- [x] mvn compile 성공 (오류 없음)
+
+## 최종 결과
+- 완료: 2026-04-02
+- 빌드: BUILD SUCCESS
+- embedding 저장 방식: JSON TEXT → MariaDB VECTOR(384) 바이너리 전환 완료

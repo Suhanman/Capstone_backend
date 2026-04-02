@@ -1,5 +1,6 @@
 package com.emailagent.domain.entity;
 
+import com.emailagent.converter.VectorConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -48,11 +49,19 @@ public class EmailAnalysisResult {
     @Column(name = "summary_text", columnDefinition = "TEXT")
     private String summaryText;
 
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
+
     // JSON 타입으로 저장 (엔티티 추출 결과)
     // 예: {"customer_name":"홍길동","company":"ABC Corp","date":"2026-04-03"}
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "entities_json", columnDefinition = "JSON")
     private Map<String, Object> entitiesJson;
+
+    // AI가 생성한 이메일 임베딩 벡터 (MariaDB VECTOR(384) 바이너리)
+    @Column(name = "email_embedding")
+    @Convert(converter = VectorConverter.class)
+    private float[] emailEmbedding;
 
     @Column(name = "model_version", length = 50)
     private String modelVersion;
@@ -75,5 +84,19 @@ public class EmailAnalysisResult {
         this.summaryText = summary;
         this.entitiesJson = entities;
         this.scheduleDetected = scheduleDetected;
+    }
+
+    /**
+     * classify 큐 AI 결과 수신 후 업데이트
+     * emailEmbedding: float[] (MariaDB VECTOR(384) 바이너리로 저장)
+     */
+    public void updateFromClassify(String domain, String intent, BigDecimal confidenceScore,
+                                   String summaryText, boolean scheduleDetected, float[] emailEmbedding) {
+        this.domain = domain;
+        this.intent = intent;
+        this.confidenceScore = confidenceScore;
+        this.summaryText = summaryText;
+        this.scheduleDetected = scheduleDetected;
+        this.emailEmbedding = emailEmbedding;
     }
 }
