@@ -15,6 +15,9 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.gmail.Gmail;
+import com.google.api.services.gmail.model.WatchRequest;
+import com.google.api.services.gmail.model.WatchResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +51,7 @@ public class GoogleOAuthService {
     private final IntegrationRepository integrationRepository;
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final GoogleApiClientProvider googleApiClientProvider;
 
     @Value("${app.google.client-id}")
     private String clientId;
@@ -57,6 +61,9 @@ public class GoogleOAuthService {
 
     @Value("${app.google.redirect-uri}")
     private String redirectUri;
+
+    @Value("${app.google.topic-name}")
+    private String topicName;
 
     // ── 1. Google OAuth 인증 URL 생성 ──────────────────────────────────────────
 
@@ -126,23 +133,28 @@ public class GoogleOAuthService {
                 .plusSeconds(tokenResponse.getExpiresInSeconds());
 
         // 6. Integrations upsert (이미 연동됐으면 갱신, 없으면 신규 생성)
-        final boolean gmailFlag = isGmailConnected;
+        // watch() 호출을 위해 저장된 Integration 참조를 반환받는다.
+        final boolean gmailFlag    = isGmailConnected;
         final boolean calendarFlag = isCalendarConnected;
-        integrationRepository.findByUser_UserId(userId).ifPresentOrElse(
-                existing -> existing.updateTokens(
-                        tokenResponse.getAccessToken(),
-                        tokenResponse.getRefreshToken(),
-                        tokenExpiresAt,
-                        grantedScopesRaw,
-                        connectedEmail,
-                        externalAccountId,
-                        gmailFlag,
-                        calendarFlag
-                ),
-                () -> {
+
+        Integration savedIntegration = integrationRepository.findByUser_UserId(userId)
+                .map(existing -> {
+                    existing.updateTokens(
+                            tokenResponse.getAccessToken(),
+                            tokenResponse.getRefreshToken(),
+                            tokenExpiresAt,
+                            grantedScopesRaw,
+                            connectedEmail,
+                            externalAccountId,
+                            gmailFlag,
+                            calendarFlag
+                    );
+                    return existing;
+                })
+                .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-                    Integration integration = Integration.builder()
+                    return integrationRepository.save(Integration.builder()
                             .user(user)
                             .connectedEmail(connectedEmail)
                             .externalAccountId(externalAccountId)
@@ -154,10 +166,22 @@ public class GoogleOAuthService {
                             .isCalendarConnected(calendarFlag)
                             .syncStatus(SyncStatus.CONNECTED)
                             .lastSyncedAt(LocalDateTime.now())
-                            .build();
-                    integrationRepository.save(integration);
-                }
-        );
+                            .build());
+                });
+
+        // 7. Gmail watch() 등록 — Pub/Sub Push 알림 수신 구독 시작
+        // watch 실패 시 OAuth 연동 자체는 유지되어야 하므로 별도 try-catch로 격리
+        try {
+            Gmail gmailClient = googleApiClientProvider.buildGmailClient(savedIntegration);
+            WatchRequest watchRequest = new WatchRequest()
+                    .setTopicName(topicName)
+                    .setLabelIds(List.of("INBOX"));
+            WatchResponse watchResponse = gmailClient.users().watch("me", watchRequest).execute();
+            log.info("[OAuth] Gmail watch() 등록 완료 — userId={}, historyId={}, expiration={}",
+                    userId, watchResponse.getHistoryId(), watchResponse.getExpiration());
+        } catch (Exception e) {
+            log.error("[OAuth] Gmail watch() 등록 실패 — userId={}, error={}", userId, e.getMessage(), e);
+        }
 
         return new CallbackResponse(isGmailConnected, isCalendarConnected);
     }

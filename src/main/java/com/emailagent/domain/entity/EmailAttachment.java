@@ -36,10 +36,7 @@ public class EmailAttachment {
     @Column(name = "file_path", length = 1000)
     private String filePath;
 
-    /**
-     * Gmail 첨부파일 식별자.
-     * TODO: Google OAuth 팀 담당 - Gmail API 다운로드 시 사용
-     */
+    /** Gmail 첨부파일 식별자. GmailApiService.getAttachmentBytes() 호출 시 사용 */
     @Column(name = "external_attachment_id", length = 256)
     private String externalAttachmentId;
 

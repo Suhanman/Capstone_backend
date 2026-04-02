@@ -78,6 +78,12 @@
             <version>1.43.3</version>
         </dependency>
 
+        <!-- Jakarta Mail — Gmail API MimeMessage 생성용 (Spring Boot BOM 관리) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

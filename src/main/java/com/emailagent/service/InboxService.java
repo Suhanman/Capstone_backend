@@ -6,6 +6,7 @@ import com.emailagent.domain.enums.EmailStatus;
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
 import com.emailagent.dto.request.inbox.RegenerateRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
+import com.emailagent.dto.response.inbox.AttachmentDownloadResult;
 import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse.*;
@@ -17,17 +18,12 @@ import com.emailagent.messaging.EmailMessagePublisher;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.MalformedURLException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +44,7 @@ public class InboxService {
     private final BusinessProfileRepository businessProfileRepository;
     private final EmailMessagePublisher emailMessagePublisher;
     private final BusinessService businessService;
+    private final GmailApiService gmailApiService;
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
@@ -170,8 +167,14 @@ public class InboxService {
 
         String message = switch (action) {
             case "SEND" -> {
-                // TODO: Gmail API로 draft.getDraftContent() 발송 (Google OAuth 팀 담당)
-                log.info("[TODO] Gmail 발송 - emailId={}, body={}", emailId, draft.getDraftContent());
+                // AI가 생성한 초안 그대로 발송
+                // 발송 실패 시 EmailSendFailedException → 트랜잭션 롤백 (상태 변경 취소)
+                gmailApiService.sendEmail(
+                        userId,
+                        email.getSenderEmail(),
+                        draft.getDraftSubject() != null ? draft.getDraftSubject() : "Re: " + email.getSubject(),
+                        draft.getDraftContent()
+                );
                 email.updateStatus(EmailStatus.PROCESSED);
                 draft.updateStatus(DraftStatus.SENT);
                 yield "답장이 발송되었습니다.";
@@ -180,8 +183,13 @@ public class InboxService {
                 if (request.getContent() == null || request.getContent().isBlank()) {
                     throw new IllegalArgumentException("EDIT_SEND 액션은 content가 필요합니다.");
                 }
-                // TODO: Gmail API로 request.getContent() 발송 (Google OAuth 팀 담당)
-                log.info("[TODO] Gmail 수정 발송 - emailId={}, body={}", emailId, request.getContent());
+                // 사용자가 수정한 내용으로 발송
+                gmailApiService.sendEmail(
+                        userId,
+                        email.getSenderEmail(),
+                        draft.getDraftSubject() != null ? draft.getDraftSubject() : "Re: " + email.getSubject(),
+                        request.getContent()
+                );
                 email.updateStatus(EmailStatus.PROCESSED);
                 draft.updateStatus(DraftStatus.EDITED);
                 yield "수정된 답장이 발송되었습니다.";
@@ -252,31 +260,29 @@ public class InboxService {
     // =============================================
 
     @Transactional(readOnly = true)
-    public Resource downloadAttachment(Long userId, Long emailId, Long attachmentId) {
-        // 1. 이메일 조회 — userId로 본인 소유 여부 검증
-        findEmailForUser(emailId, userId);
+    public AttachmentDownloadResult downloadAttachment(Long userId, Long emailId, Long attachmentId) {
+        // 1. 이메일 조회 — userId로 본인 소유 여부 검증, Gmail messageId 확보
+        Email email = findEmailForUser(emailId, userId);
 
-        // 2. 첨부파일 조회 — email_id와 attachment_id 조합으로 归속 검증
+        // 2. 첨부파일 조회 — email_id + attachment_id 조합으로 소유 검증
         EmailAttachment attachment = emailAttachmentRepository
                 .findByAttachmentIdAndEmail_EmailId(attachmentId, emailId)
                 .orElseThrow(() -> new ResourceNotFoundException("첨부파일을 찾을 수 없습니다."));
 
-        // TODO: Gmail API를 통한 실제 첨부파일 다운로드 (Google OAuth 팀 담당)
-        //       attachment.getExternalAttachmentId() 를 사용하여 Gmail API 호출 후 바이트 반환
-        log.info("[TODO] Gmail 첨부파일 다운로드 - emailId={}, attachmentId={}, externalId={}",
-                emailId, attachmentId, attachment.getExternalAttachmentId());
+        // 3. Gmail API 호출: externalMsgId + externalAttachmentId로 바이트 취득
+        //    gmailApiService 내부에서 Base64URL 디코딩 처리
+        byte[] data = gmailApiService.getAttachmentBytes(
+                userId,
+                email.getExternalMsgId(),
+                attachment.getExternalAttachmentId()
+        );
 
-        // 3. 로컬 저장 경로 기준 Resource 반환
-        try {
-            Path filePath = Paths.get(attachment.getFilePath()).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new ResourceNotFoundException("첨부파일을 읽을 수 없습니다.");
-            }
-            return resource;
-        } catch (MalformedURLException e) {
-            throw new ResourceNotFoundException("첨부파일 경로가 올바르지 않습니다.");
-        }
+        // 4. DB에서 조회한 원본 파일명과 MIME 타입을 함께 반환 (응답 헤더 세팅에 사용)
+        String mimeType = attachment.getMimeType() != null
+                ? attachment.getMimeType()
+                : "application/octet-stream";
+
+        return new AttachmentDownloadResult(data, attachment.getFileName(), mimeType);
     }
 
     // =============================================

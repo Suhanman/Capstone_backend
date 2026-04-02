@@ -396,8 +396,8 @@ CREATE TABLE SupportTickets (
 
 메시지 큐(RabbitMQ) 기반 AI 파이프라인의 데이터 전송 상태를 추적하고, 관리자 모니터링 및 전송 실패 시 재시도를 관리하는 테이블
 CREATE TABLE Outbox (
-outbox_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 아웃박스 ID
-email_id BIGINT NOT NULL, -- 이메일 ID
+    outbox_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 아웃박스 ID
+    email_id BIGINT NOT NULL, -- 이메일 ID
 
     status ENUM('READY', 'SENDING', 'FINISH', 'FAILED') NOT NULL DEFAULT 'READY', -- 파이프라인 상태
     payload JSON NOT NULL, -- 전송 페이로드 (email_id, 본문 데이터 등)

@@ -26,6 +26,7 @@ public class CalendarService {
     private final CalendarEventRepository calendarEventRepository;
     private final UserRepository userRepository;
     private final IntegrationRepository integrationRepository;
+    private final GoogleCalendarApiService googleCalendarApiService;
 
     // =============================================
     // GET /api/calendar/events?start_date=&end_date=
@@ -77,8 +78,9 @@ public class CalendarService {
 
         CalendarEvent saved = calendarEventRepository.save(event);
 
-        // TODO: Google Calendar API로 실제 일정 추가 (Google OAuth 팀 담당)
-        log.info("[TODO] Google Calendar 추가 - eventId={}, title={}", saved.getEventId(), saved.getTitle());
+        // Google Calendar API에 일정 등록 후 반환된 googleEventId 저장
+        String googleEventId = googleCalendarApiService.createEvent(userId, saved);
+        saved.markAsCalendarAdded(googleEventId);
 
         return CalendarEventDetailResponse.from(saved);
     }
@@ -97,8 +99,10 @@ public class CalendarService {
 
         event.updateStatus("CONFIRMED");
 
-        // TODO: Google Calendar API로 실제 일정 추가 (Google OAuth 팀 담당)
-        log.info("[TODO] Google Calendar 추가(confirm) - eventId={}, title={}", event.getEventId(), event.getTitle());
+        // CONFIRMED 전환 시 Google Calendar에 등록 (최초 1회)
+        // GoogleCalendarApiService 내부에서 is_calendar_connected 검증 수행
+        String googleEventId = googleCalendarApiService.createEvent(userId, event);
+        event.markAsCalendarAdded(googleEventId);
 
         return CalendarEventDetailResponse.from(event);
     }
@@ -113,8 +117,10 @@ public class CalendarService {
 
         event.update(request.getTitle(), request.getStartDatetime(), request.getEndDatetime());
 
-        // TODO: Google Calendar API로 실제 일정 수정 (Google OAuth 팀 담당)
-        log.info("[TODO] Google Calendar 수정 - eventId={}, title={}", event.getEventId(), event.getTitle());
+        // Google Calendar에 등록된 일정만 API로 수정 (googleEventId 있을 때만)
+        if (event.isCalendarAdded() && event.getGoogleEventId() != null) {
+            googleCalendarApiService.updateEvent(userId, event.getGoogleEventId(), event);
+        }
 
         return CalendarEventDetailResponse.from(event);
     }
@@ -127,10 +133,9 @@ public class CalendarService {
     public void deleteEvent(Long userId, Long eventId) {
         CalendarEvent event = findEventForUser(eventId, userId);
 
-        // isCalendarAdded=true인 경우 Google Calendar에서도 삭제 필요
-        if (event.isCalendarAdded()) {
-            // TODO: Google Calendar API로 실제 일정 삭제 (Google OAuth 팀 담당)
-            log.info("[TODO] Google Calendar 삭제 - eventId={}, title={}", event.getEventId(), event.getTitle());
+        // Google Calendar에 등록된 일정은 API로 먼저 삭제 후 DB에서 제거
+        if (event.isCalendarAdded() && event.getGoogleEventId() != null) {
+            googleCalendarApiService.deleteEvent(userId, event.getGoogleEventId());
         }
 
         calendarEventRepository.delete(event);

@@ -3,6 +3,7 @@ package com.emailagent.controller;
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
 import com.emailagent.dto.request.inbox.RegenerateRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
+import com.emailagent.dto.response.inbox.AttachmentDownloadResult;
 import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxListResponse;
@@ -13,11 +14,13 @@ import com.emailagent.service.InboxService;
 import com.emailagent.service.RecommendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/inbox")
@@ -73,19 +76,25 @@ public class InboxController {
     }
 
     // GET /api/inbox/{email_id}/attachments/{attachment_id}
+    // 성공: 바이너리 파일 스트림 반환 (BaseResponse 예외 적용 API)
+    // 실패: GlobalExceptionHandler가 BaseResponse JSON으로 처리
     @GetMapping("/{emailId}/attachments/{attachmentId}")
-    public ResponseEntity<Resource> downloadAttachment(
+    public ResponseEntity<byte[]> downloadAttachment(
             @CurrentUser Long userId,
             @PathVariable Long emailId,
             @PathVariable Long attachmentId) {
-        Resource resource = inboxService.downloadAttachment(userId, emailId, attachmentId);
+        AttachmentDownloadResult result = inboxService.downloadAttachment(userId, emailId, attachmentId);
 
-        String filename = resource.getFilename() != null ? resource.getFilename() : "attachment";
+        // 한글 파일명 깨짐 방지: RFC 5987 방식 (filename*=UTF-8''인코딩값)
+        String encodedFileName = URLEncoder.encode(result.fileName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        String contentDisposition = "attachment; filename=\"" + result.fileName() + "\"; "
+                + "filename*=UTF-8''" + encodedFileName;
+
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + filename + "\"")
-                .body(resource);
+                .contentType(MediaType.parseMediaType(result.mimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .body(result.data());
     }
 
     // POST /api/inbox/{email_id}/calendar

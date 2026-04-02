@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.IOException;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -52,6 +53,20 @@ public class GlobalExceptionHandler {
                 .body(new BaseResponse(HttpStatus.FORBIDDEN.value(), e.getMessage()));
     }
 
+    @ExceptionHandler(EmailSendFailedException.class)
+    public ResponseEntity<BaseResponse> handleEmailSendFailed(EmailSendFailedException e) {
+        log.error("Gmail 메일 발송 실패", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new BaseResponse(HttpStatus.BAD_GATEWAY.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(GmailApiCallException.class)
+    public ResponseEntity<BaseResponse> handleGmailApiCall(GmailApiCallException e) {
+        log.error("Gmail API 호출 실패", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new BaseResponse(HttpStatus.BAD_GATEWAY.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<BaseResponse> handleIllegalState(IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -73,6 +88,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new BaseResponse(HttpStatus.BAD_REQUEST.value(),
                         "입력값이 올바르지 않습니다: " + resultReq));
+    }
+
+    // Google API 네트워크 오류 (token exchange, API 호출 실패 등) → 502
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<BaseResponse> handleIo(IOException e) {
+        log.error("Google API 통신 오류", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new BaseResponse(HttpStatus.BAD_GATEWAY.value(), "외부 API 통신에 실패했습니다. 잠시 후 다시 시도해 주세요."));
     }
 
     @ExceptionHandler(Exception.class)

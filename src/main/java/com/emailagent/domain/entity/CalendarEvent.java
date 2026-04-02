@@ -49,6 +49,10 @@ public class CalendarEvent {
     @Builder.Default
     private boolean isCalendarAdded = false;
 
+    // Google Calendar API 호출 후 반환받은 이벤트 ID (update/delete 시 사용)
+    @Column(name = "google_event_id", length = 255)
+    private String googleEventId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,5 +69,11 @@ public class CalendarEvent {
         this.title = title;
         this.startDatetime = startDatetime;
         this.endDatetime = endDatetime;
+    }
+
+    /** Google Calendar API 등록 완료 후 이벤트 ID 및 상태 반영 */
+    public void markAsCalendarAdded(String googleEventId) {
+        this.isCalendarAdded = true;
+        this.googleEventId = googleEventId;
     }
 }

@@ -10,6 +10,9 @@ public interface IntegrationRepository extends JpaRepository<Integration, Long> 
 
     Optional<Integration> findByUser_UserId(Long userId);
 
+    // Pub/Sub 알림의 emailAddress로 연동 정보 조회
+    Optional<Integration> findByConnectedEmail(String connectedEmail);
+
     boolean existsByUser_UserId(Long userId);
 
     void deleteByUser_UserId(Long userId);

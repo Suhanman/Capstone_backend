@@ -45,6 +45,10 @@ app:
     client-secret: ${GOOGLE_CLIENT_SECRET:}
     redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/integrations/google/callback}
     calendar-id: primary
+    topic-name: ${GOOGLE_TOPIC_NAME:}
+
+  webhook:
+    pubsub-verify-token: ${PUBSUB_VERIFY_TOKEN:}
 
 server:
   port: 8080
