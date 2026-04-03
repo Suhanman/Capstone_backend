@@ -1,14 +1,18 @@
 package com.emailagent.service;
 
 import com.emailagent.domain.entity.Email;
+import com.emailagent.domain.entity.EmailAttachment;
 import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
+import com.emailagent.repository.EmailAttachmentRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.OutboxRepository;
+import com.emailagent.util.EmailParsingUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.model.*;
@@ -28,22 +32,23 @@ import java.util.*;
  * Google Pub/Sub Push 알림의 비동기 처리 서비스.
  * WebhookController가 200 OK를 즉시 반환한 뒤 이 서비스가 별도 스레드에서 실행된다.
  *
- * 처리 흐름:
- * 1) connectedEmail로 Integration 조회 → 사용자 식별
- * 2) Gmail API로 historyId 이후 신규 메시지 목록 조회
- * 3) 각 메시지 본문 파싱 → ① Email 저장 → ② ObjectMapper로 payload 구성 → ③ Outbox(READY) 저장
- * 4) 이후 MailScheduler가 Outbox를 폴링하여 RabbitMQ로 발행
+ * 처리 흐름 (6단계 파이프라인):
+ * 1~2단계: messages.get(format=full) 조회 → headers(From/To/Subject/Date 등) 추출
+ * 3~4단계: 본문 파트 재귀 탐색 → text/plain 우선, 없으면 text/html → Base64URL 디코딩
+ * 5단계:   Jsoup HTML 제거 + 서명·인용문 제거 + 공백 정규화
+ * 6단계:   AI 서버 전송 규격 JSON으로 payload 구성 → Email·EmailAttachment 저장 → Outbox(READY) 저장
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PubSubHandlerService {
 
-    private final IntegrationRepository integrationRepository;
-    private final EmailRepository emailRepository;
-    private final OutboxRepository outboxRepository;
-    private final GoogleApiClientProvider googleApiClientProvider;
-    private final ObjectMapper objectMapper;
+    private final IntegrationRepository     integrationRepository;
+    private final EmailRepository           emailRepository;
+    private final EmailAttachmentRepository emailAttachmentRepository;
+    private final OutboxRepository          outboxRepository;
+    private final GoogleApiClientProvider   googleApiClientProvider;
+    private final ObjectMapper              objectMapper;
 
     /**
      * Pub/Sub Push 알림을 비동기로 처리한다.
@@ -93,7 +98,7 @@ public class PubSubHandlerService {
                 }
             }
 
-            // 5. 각 메시지를 파싱하여 Email + Outbox 저장
+            // 5. 각 메시지를 6단계 파이프라인으로 파싱하여 Email + EmailAttachment + Outbox 저장
             int savedCount = 0;
             for (String messageId : messageIds) {
                 boolean saved = processMessage(gmailClient, user, messageId);
@@ -110,15 +115,11 @@ public class PubSubHandlerService {
         }
     }
 
-    // ── 개별 메시지 처리 ────────────────────────────────────────────────────────
+    // ── 개별 메시지 처리 (6단계 파이프라인) ──────────────────────────────────────
 
     /**
-     * Gmail 메시지 ID로 본문을 조회하여 Email 엔티티와 Outbox(READY)를 저장한다.
-     *
-     * 저장 순서:
-     * ① Email 엔티티 저장 (email_id 획득)
-     * ② ObjectMapper로 AI 전송용 payload JSON 구성
-     * ③ Outbox(READY) 저장
+     * Gmail 메시지 ID로 상세 조회 후 6단계 파이프라인을 수행하여
+     * Email, EmailAttachment, Outbox(READY)를 저장한다.
      *
      * externalMsgId 중복 시 건너뛰고 false 반환.
      */
@@ -129,33 +130,42 @@ public class PubSubHandlerService {
             return false;
         }
 
-        // Gmail API로 전체 메시지 조회 (헤더 + 본문 포함)
+        // 1~2단계: messages.get(format=full)로 전체 메시지 조회 후 헤더 추출
         Message message = gmailClient.users().messages()
                 .get("me", messageId)
                 .setFormat("full")
                 .execute();
 
-        // 헤더에서 발신자/제목 추출
-        Map<String, String> headers = parseHeaders(message.getPayload().getHeaders());
-        String senderRaw = headers.getOrDefault("From", "");
-        String subject   = headers.getOrDefault("Subject", "(제목 없음)");
+        MessagePart payload = message.getPayload();
+        Map<String, String> headers = EmailParsingUtil.parseHeaders(payload.getHeaders());
 
-        String senderName  = extractSenderName(senderRaw);
-        String senderEmail = extractSenderEmail(senderRaw);
+        String fromRaw  = headers.getOrDefault("From", "");
+        String to       = headers.getOrDefault("To", "");
+        String subject  = headers.getOrDefault("Subject", "(제목 없음)");
+        String dateStr  = headers.getOrDefault("Date", "");
 
-        // internalDate(ms) 기준으로 수신 시각 변환
+        String senderName  = EmailParsingUtil.extractSenderName(fromRaw);
+        String senderEmail = EmailParsingUtil.extractSenderEmail(fromRaw);
+
+        // ISO-8601 날짜 문자열 (Date 헤더 파싱 실패 시 internalDate fallback)
+        String isoDate = EmailParsingUtil.formatEmailDate(dateStr, message.getInternalDate());
+
+        // internalDate 기반 수신 시각 (DB 저장용 LocalDateTime)
         LocalDateTime receivedAt = message.getInternalDate() != null
                 ? LocalDateTime.ofInstant(
-                        Instant.ofEpochMilli(message.getInternalDate()),
-                        ZoneId.of("Asia/Seoul"))
+                        Instant.ofEpochMilli(message.getInternalDate()), ZoneId.of("Asia/Seoul"))
                 : LocalDateTime.now();
 
-        // 본문 추출 — plain text 우선, 없으면 HTML 태그 제거
-        String bodyRaw   = extractBody(message.getPayload(), "text/html");
-        String bodyClean = extractBody(message.getPayload(), "text/plain");
-        if (bodyClean.isBlank()) {
-            bodyClean = stripHtml(bodyRaw);
-        }
+        // 3~4단계: 본문 파트 재귀 탐색 + Base64URL 디코딩
+        //          text/plain 우선, 없으면 text/html (attachment 파트 제외)
+        String bodyRaw = EmailParsingUtil.extractBodyRaw(payload);
+        boolean isHtml = EmailParsingUtil.isHtmlBody(payload);
+
+        // 5단계: HTML 태그 제거(Jsoup), 서명·인용문·footer 제거, 공백 정규화
+        String bodyClean = EmailParsingUtil.cleanBody(bodyRaw, isHtml);
+
+        // 첨부파일 파트 수집 (6단계 JSON 구성 및 EmailAttachment 저장에 사용)
+        List<MessagePart> attachmentParts = EmailParsingUtil.collectAttachmentParts(payload);
 
         // ① Email 엔티티 저장 — email_id 획득
         Email email = Email.builder()
@@ -170,89 +180,52 @@ public class PubSubHandlerService {
                 .build();
         emailRepository.save(email);
 
-        // ② ObjectMapper로 AI 서버 전송용 payload 구성
-        // email_id, user_id, 제목, 발신자, 정제 본문을 JSON 구조로 조합
+        // ② EmailAttachment 저장 — 파일 바이너리는 버리고 메타데이터(이름/타입/크기/외부ID)만 저장
+        for (MessagePart attPart : attachmentParts) {
+            EmailAttachment attachment = EmailAttachment.builder()
+                    .email(email)
+                    .fileName(attPart.getFilename())
+                    .mimeType(attPart.getMimeType())
+                    .fileSize(attPart.getBody() != null && attPart.getBody().getSize() != null
+                            ? attPart.getBody().getSize().longValue() : null)
+                    .externalAttachmentId(attPart.getBody() != null
+                            ? attPart.getBody().getAttachmentId() : null)
+                    .build();
+            emailAttachmentRepository.save(attachment);
+        }
+
+        // ③ 6단계: AI 서버 전송용 payload JSON 구성 (규격 준수)
         ObjectNode payloadNode = objectMapper.createObjectNode();
-        payloadNode.put("email_id",    email.getEmailId());
-        payloadNode.put("user_id",     user.getUserId());
-        payloadNode.put("subject",     subject);
-        payloadNode.put("sender_email", senderEmail);
-        payloadNode.put("body_clean",  bodyClean);
+        payloadNode.put("messageId",     messageId);
+        payloadNode.put("threadId",      message.getThreadId());
+        payloadNode.put("subject",       subject);
+        payloadNode.put("from",          senderEmail);
+        payloadNode.put("to",            to);
+        payloadNode.put("date",          isoDate);
+        payloadNode.put("body_raw",      bodyRaw);
+        payloadNode.put("body_clean",    bodyClean);
+        payloadNode.put("hasAttachments", !attachmentParts.isEmpty());
 
-        Map<String, Object> payload = objectMapper.convertValue(payloadNode, new TypeReference<>() {});
+        ArrayNode attachmentsNode = objectMapper.createArrayNode();
+        for (MessagePart attPart : attachmentParts) {
+            ObjectNode attNode = objectMapper.createObjectNode();
+            attNode.put("filename", attPart.getFilename());
+            attNode.put("mimeType", attPart.getMimeType());
+            attachmentsNode.add(attNode);
+        }
+        payloadNode.set("attachments", attachmentsNode);
 
-        // ③ Outbox(READY) 저장 — MailScheduler가 폴링하여 RabbitMQ(q.ai.inbound)로 발행
+        Map<String, Object> payloadMap = objectMapper.convertValue(payloadNode, new TypeReference<>() {});
+
+        // ④ Outbox(READY) 저장 — MailScheduler가 폴링하여 RabbitMQ(q.ai.inbound)로 발행
         Outbox outbox = Outbox.builder()
                 .email(email)
-                .payload(payload)
+                .payload(payloadMap)
                 .build();
         outboxRepository.save(outbox);
 
-        log.info("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}",
-                messageId, subject, senderEmail);
+        log.info("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
+                messageId, subject, senderEmail, attachmentParts.size());
         return true;
-    }
-
-    // ── 헤더 파싱 헬퍼 ──────────────────────────────────────────────────────────
-
-    private Map<String, String> parseHeaders(List<MessagePartHeader> headers) {
-        Map<String, String> map = new HashMap<>();
-        if (headers == null) return map;
-        for (MessagePartHeader h : headers) {
-            map.put(h.getName(), h.getValue());
-        }
-        return map;
-    }
-
-    /** "홍길동 <user@gmail.com>" 형식에서 이름만 추출 */
-    private String extractSenderName(String from) {
-        int lt = from.indexOf('<');
-        if (lt > 0) {
-            return from.substring(0, lt).trim().replace("\"", "");
-        }
-        return "";
-    }
-
-    /** "홍길동 <user@gmail.com>" 또는 "user@gmail.com" 에서 이메일만 추출 */
-    private String extractSenderEmail(String from) {
-        int lt = from.indexOf('<');
-        int gt = from.indexOf('>');
-        if (lt >= 0 && gt > lt) {
-            return from.substring(lt + 1, gt).trim();
-        }
-        return from.trim();
-    }
-
-    // ── 본문 추출 헬퍼 ──────────────────────────────────────────────────────────
-
-    /**
-     * Gmail 메시지 파트를 재귀 탐색하여 지정 mimeType의 본문을 추출한다.
-     * Gmail은 multipart 구조이므로 parts 배열을 재귀적으로 탐색해야 한다.
-     * 데이터는 Base64URL 인코딩 상태로 들어오므로 디코딩하여 반환한다.
-     */
-    private String extractBody(MessagePart part, String targetMime) {
-        if (part == null) return "";
-
-        if (targetMime.equals(part.getMimeType())
-                && part.getBody() != null
-                && part.getBody().getData() != null) {
-            return new String(Base64.getUrlDecoder().decode(part.getBody().getData()));
-        }
-
-        if (part.getParts() != null) {
-            for (MessagePart subPart : part.getParts()) {
-                String result = extractBody(subPart, targetMime);
-                if (!result.isBlank()) return result;
-            }
-        }
-        return "";
-    }
-
-    /** AI 전달용 순수 텍스트 생성 — HTML 태그와 연속 공백 제거 */
-    private String stripHtml(String html) {
-        if (html == null || html.isBlank()) return "";
-        return html.replaceAll("<[^>]*>", " ")
-                   .replaceAll("\\s{2,}", " ")
-                   .trim();
     }
 }

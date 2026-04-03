@@ -78,6 +78,13 @@
             <version>1.43.3</version>
         </dependency>
 
+        <!-- HTML 태그 제거 (이메일 본문 정제용) -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+
         <!-- Jakarta Mail — Gmail API MimeMessage 생성용 (Spring Boot BOM 관리) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
