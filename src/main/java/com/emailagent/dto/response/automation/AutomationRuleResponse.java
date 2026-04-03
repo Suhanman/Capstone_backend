@@ -17,8 +17,6 @@ public class AutomationRuleResponse extends BaseResponse {
 
     private CategoryDto category;
 
-    private List<String> keywords;
-
     private TemplateDto template;
 
     @JsonProperty("auto_send_enabled")
@@ -66,7 +64,6 @@ public class AutomationRuleResponse extends BaseResponse {
                         .name(rule.getCategory().getCategoryName())
                         .color(rule.getCategory().getColor())
                         .build())
-                .keywords(rule.getKeywords())
                 .template(templateDto)
                 .autoSendEnabled(rule.isAutoSendEnabled())
                 .autoCalendarEnabled(rule.isAutoCalendarEnabled())

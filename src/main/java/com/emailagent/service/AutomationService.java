@@ -63,7 +63,6 @@ public class AutomationService {
                 .user(user)
                 .category(category)
                 .template(template)
-                .keywords(request.getKeywords() != null ? request.getKeywords() : List.of())
                 .autoSendEnabled(request.isAutoSendEnabled())
                 .build();
 
@@ -82,8 +81,7 @@ public class AutomationService {
         Category category = findOrCreateCategory(user, request.getCategoryName(), request.getColor());
         Template template = resolveTemplate(request.getTemplateId(), userId);
 
-        rule.update(category, template, request.getKeywords() != null ? request.getKeywords() : List.of(),
-                request.isAutoSendEnabled());
+        rule.update(category, template, request.isAutoSendEnabled());
 
         return AutomationRuleResponse.from(rule);
     }

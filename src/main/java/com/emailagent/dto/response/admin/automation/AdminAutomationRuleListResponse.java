@@ -28,15 +28,12 @@ public class AdminAutomationRuleListResponse extends BaseResponse {
         @JsonProperty("user_id")
         private final long userId;
 
-        private final String keywords;
-
         @JsonProperty("is_active")
         private final boolean active;
 
-        public RuleItem(long ruleId, long userId, String keywords, boolean active) {
+        public RuleItem(long ruleId, long userId, boolean active) {
             this.ruleId = ruleId;
             this.userId = userId;
-            this.keywords = keywords;
             this.active = active;
         }
     }

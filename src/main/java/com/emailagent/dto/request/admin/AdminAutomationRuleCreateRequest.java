@@ -1,7 +1,6 @@
 package com.emailagent.dto.request.admin;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,9 +19,6 @@ public class AdminAutomationRuleCreateRequest {
 
     @JsonProperty("template_id")
     private Long templateId;
-
-    @NotBlank
-    private String keywords;
 
     @NotNull
     @JsonProperty("auto_send_enabled")

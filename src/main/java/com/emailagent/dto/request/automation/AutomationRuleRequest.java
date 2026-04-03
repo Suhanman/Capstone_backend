@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Getter
 @NoArgsConstructor
 public class AutomationRuleRequest {
@@ -16,8 +14,6 @@ public class AutomationRuleRequest {
     private String categoryName;
 
     private String color;
-
-    private List<String> keywords;
 
     @JsonProperty("template_id")
     private Long templateId;
