@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 public class SupportTicketListResponse extends BaseResponse {
 
-    private List<TicketSummary> data;
+    private List<TicketSummary> tickets;
 
     @Getter
     @Builder
@@ -51,7 +51,7 @@ public class SupportTicketListResponse extends BaseResponse {
 
     public static SupportTicketListResponse of(List<SupportTicket> tickets) {
         return SupportTicketListResponse.builder()
-                .data(tickets.stream().map(TicketSummary::from).toList())
+                .tickets(tickets.stream().map(TicketSummary::from).toList())
                 .build();
     }
 }

@@ -10,5 +10,5 @@ import java.util.List;
 @Builder
 public class FaqListResponse extends BaseResponse {
 
-    private List<FaqResponse> data;
+    private List<FaqResponse> faqs;
 }

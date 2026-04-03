@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 public class ScheduleResponse extends BaseResponse {
 
-    private List<ScheduleItem> data;
+    private List<ScheduleItem> schedules;
 
     @Getter
     @Builder

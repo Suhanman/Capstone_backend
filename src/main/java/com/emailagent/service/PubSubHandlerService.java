@@ -1,11 +1,10 @@
 package com.emailagent.service;
 
 import com.emailagent.domain.entity.Email;
-import com.emailagent.domain.entity.EmailAttachment;
 import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
-import com.emailagent.repository.EmailAttachmentRepository;
+import com.emailagent.dto.inbox.AttachmentMetaDto;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.OutboxRepository;
@@ -36,17 +35,16 @@ import java.util.*;
  * 1~2단계: messages.get(format=full) 조회 → headers(From/To/Subject/Date 등) 추출
  * 3~4단계: 본문 파트 재귀 탐색 → text/plain 우선, 없으면 text/html → Base64URL 디코딩
  * 5단계:   Jsoup HTML 제거 + 서명·인용문 제거 + 공백 정규화
- * 6단계:   AI 서버 전송 규격 JSON으로 payload 구성 → Email·EmailAttachment 저장 → Outbox(READY) 저장
+ * 6단계:   AI 서버 전송 규격 JSON으로 payload 구성 → Email(attachments_meta 포함) 저장 → Outbox(READY) 저장
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PubSubHandlerService {
 
-    private final IntegrationRepository     integrationRepository;
-    private final EmailRepository           emailRepository;
-    private final EmailAttachmentRepository emailAttachmentRepository;
-    private final OutboxRepository          outboxRepository;
+    private final IntegrationRepository   integrationRepository;
+    private final EmailRepository         emailRepository;
+    private final OutboxRepository        outboxRepository;
     private final GoogleApiClientProvider   googleApiClientProvider;
     private final ObjectMapper              objectMapper;
 
@@ -98,7 +96,7 @@ public class PubSubHandlerService {
                 }
             }
 
-            // 5. 각 메시지를 6단계 파이프라인으로 파싱하여 Email + EmailAttachment + Outbox 저장
+            // 5. 각 메시지를 6단계 파이프라인으로 파싱하여 Email(attachments_meta 포함) + Outbox 저장
             int savedCount = 0;
             for (String messageId : messageIds) {
                 boolean saved = processMessage(gmailClient, user, messageId);
@@ -119,7 +117,7 @@ public class PubSubHandlerService {
 
     /**
      * Gmail 메시지 ID로 상세 조회 후 6단계 파이프라인을 수행하여
-     * Email, EmailAttachment, Outbox(READY)를 저장한다.
+     * Email(attachments_meta JSON 포함), Outbox(READY)를 저장한다.
      *
      * externalMsgId 중복 시 건너뛰고 false 반환.
      */
@@ -167,7 +165,23 @@ public class PubSubHandlerService {
         // 첨부파일 파트 수집 (6단계 JSON 구성 및 EmailAttachment 저장에 사용)
         List<MessagePart> attachmentParts = EmailParsingUtil.collectAttachmentParts(payload);
 
-        // ① Email 엔티티 저장 — email_id 획득
+        // ① attachments_meta JSON 구성 — 1-based 시퀀스 attachment_id 부여
+        //    Gmail 실제 ID(String)는 gmail_attachment_id 필드에 별도 보관
+        List<AttachmentMetaDto> attachmentMetaList = new ArrayList<>();
+        for (int i = 0; i < attachmentParts.size(); i++) {
+            MessagePart attPart = attachmentParts.get(i);
+            attachmentMetaList.add(AttachmentMetaDto.builder()
+                    .attachmentId(i + 1)
+                    .gmailAttachmentId(attPart.getBody() != null
+                            ? attPart.getBody().getAttachmentId() : null)
+                    .fileName(attPart.getFilename())
+                    .contentType(attPart.getMimeType())
+                    .size(attPart.getBody() != null && attPart.getBody().getSize() != null
+                            ? attPart.getBody().getSize().longValue() : null)
+                    .build());
+        }
+
+        // ② Email 엔티티 저장 — has_attachments · attachments_meta 포함
         Email email = Email.builder()
                 .user(user)
                 .externalMsgId(messageId)
@@ -177,22 +191,10 @@ public class PubSubHandlerService {
                 .bodyRaw(bodyRaw)
                 .bodyClean(bodyClean)
                 .receivedAt(receivedAt)
+                .hasAttachments(!attachmentMetaList.isEmpty())
+                .attachmentsMeta(attachmentMetaList.isEmpty() ? null : attachmentMetaList)
                 .build();
         emailRepository.save(email);
-
-        // ② EmailAttachment 저장 — 파일 바이너리는 버리고 메타데이터(이름/타입/크기/외부ID)만 저장
-        for (MessagePart attPart : attachmentParts) {
-            EmailAttachment attachment = EmailAttachment.builder()
-                    .email(email)
-                    .fileName(attPart.getFilename())
-                    .mimeType(attPart.getMimeType())
-                    .fileSize(attPart.getBody() != null && attPart.getBody().getSize() != null
-                            ? attPart.getBody().getSize().longValue() : null)
-                    .externalAttachmentId(attPart.getBody() != null
-                            ? attPart.getBody().getAttachmentId() : null)
-                    .build();
-            emailAttachmentRepository.save(attachment);
-        }
 
         // ③ 6단계: AI 서버 전송용 payload JSON 구성 (규격 준수)
         ObjectNode payloadNode = objectMapper.createObjectNode();

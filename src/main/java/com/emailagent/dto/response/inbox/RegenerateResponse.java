@@ -6,19 +6,10 @@ import lombok.Getter;
 @Getter
 public class RegenerateResponse extends BaseResponse {
 
-    private final Data data;
+    private final String message;
 
     public RegenerateResponse(String message) {
         super();
-        this.data = new Data(message);
-    }
-
-    @Getter
-    public static class Data {
-        private final String message;
-
-        public Data(String message) {
-            this.message = message;
-        }
+        this.message = message;
     }
 }

@@ -42,7 +42,7 @@ public class NotificationService {
         }
 
         return NotificationResponse.ListResponse.builder()
-                .data(data)
+                .notifications(data)
                 .build();
     }
 

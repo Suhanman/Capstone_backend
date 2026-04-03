@@ -10,5 +10,5 @@ import java.util.List;
 @Builder
 public class BusinessResourceListResponse extends BaseResponse {
 
-    private List<BusinessResourceResponse> data;
+    private List<BusinessResourceResponse> resources;
 }

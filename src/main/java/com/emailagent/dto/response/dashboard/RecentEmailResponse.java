@@ -12,7 +12,7 @@ import java.util.List;
 @Builder
 public class RecentEmailResponse extends BaseResponse {
 
-    private List<EmailItem> data;
+    private List<EmailItem> emails;
 
     @Getter
     @Builder

@@ -10,6 +10,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+
+
 @Getter
 @Builder
 public class InboxDetailResponse extends BaseResponse {
@@ -38,6 +40,12 @@ public class InboxDetailResponse extends BaseResponse {
 
         @JsonProperty("received_at")
         private LocalDateTime receivedAt;
+
+        @JsonProperty("has_attachments")
+        private boolean hasAttachments;
+
+        /** 첨부파일 목록 — gmail_attachment_id 미포함, 프론트 전달 안전 */
+        private List<AttachmentResponseDto> attachments;
     }
 
     // ── AI 분석 결과 ─────────────────────────────

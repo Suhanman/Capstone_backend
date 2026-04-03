@@ -171,6 +171,9 @@ CREATE TABLE Emails (
     body_raw LONGTEXT,         -- 원문 본문(HTML/plain 포함 원본 기준)
     body_clean LONGTEXT NOT NULL, -- AI 분석용 정제 본문
 
+    has_attachments BOOLEAN NOT NULL DEFAULT FALSE, -- [추가됨] 첨부파일 유무
+    attachments_meta JSON, -- [추가됨] 첨부파일 메타데이터 배열
+    
     received_at DATETIME NOT NULL,
 
     status ENUM('PENDING_REVIEW', 'PROCESSED', 'AUTO_SENT') NOT NULL DEFAULT 'PENDING_REVIEW',

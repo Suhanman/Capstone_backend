@@ -40,7 +40,7 @@ public class AutomationService {
                 .toList();
 
         return AutomationRuleResponse.ListResponse.builder()
-                .data(data)
+                .rules(data)
                 .build();
     }
 

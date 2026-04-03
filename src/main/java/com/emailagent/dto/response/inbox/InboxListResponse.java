@@ -41,6 +41,9 @@ public class InboxListResponse extends BaseResponse {
         @JsonProperty("schedule_detected")
         private boolean scheduleDetected;
 
+        @JsonProperty("has_attachments")
+        private boolean hasAttachments;
+
         public static EmailItem from(Email email) {
             EmailAnalysisResult ar = email.getAnalysisResult();
             return EmailItem.builder()
@@ -52,6 +55,7 @@ public class InboxListResponse extends BaseResponse {
                     .categoryName(ar != null && ar.getCategory() != null
                             ? ar.getCategory().getCategoryName() : null)
                     .scheduleDetected(ar != null && ar.isScheduleDetected())
+                    .hasAttachments(email.isHasAttachments())
                     .build();
         }
     }

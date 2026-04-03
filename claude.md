@@ -52,7 +52,7 @@
       3) `result_code`: int (HTTP 상태 코드 사용. 예: 200, 400, 403)
       4) `result_req`: String (성공 시 빈 문자열 "", 에러 시 구체적 사유 및 내부 에러 코드 명시)
    - 개별 API의 비즈니스 데이터는 위 공통 필드와 같은 레벨(Flat 구조)에 추가한다. 임의의 중첩된 `data` 객체를 새로 만들지 않는다.
-   - 하위 응답 클래스에서 `success`, `content_type` 등을 중복 선언(Field Shadowing)하여 부모의 필드를 덮어쓰지 않도록 주의한다.
+   - 하위 응답 클래스에서 `success`, `content_type` 등을 중복 선언하여 부모의 필드를 덮어쓰지 않도록 주의한다.
 
 4. 예외 처리:
    - `try-catch`로 뭉뚱그리지 않고, `@RestControllerAdvice`를 활용한 전역 예외 처리(`GlobalExceptionHandler`)를 지향한다.

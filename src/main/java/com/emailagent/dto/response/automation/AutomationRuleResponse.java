@@ -48,7 +48,7 @@ public class AutomationRuleResponse extends BaseResponse {
     @Getter
     @Builder
     public static class ListResponse extends BaseResponse {
-        private List<AutomationRuleResponse> data;
+        private List<AutomationRuleResponse> rules;
     }
 
     public static AutomationRuleResponse from(AutomationRule rule) {

@@ -13,12 +13,11 @@ import java.util.List;
 @Getter
 public class RecommendedDraftResponse extends BaseResponse {
 
-    @JsonProperty("data")
-    private final List<DraftItem> data;
+    private final List<DraftItem> drafts;
 
-    public RecommendedDraftResponse(List<DraftItem> data) {
+    public RecommendedDraftResponse(List<DraftItem> drafts) {
         super();
-        this.data = data;
+        this.drafts = drafts;
     }
 
     @Getter

@@ -30,7 +30,7 @@ public class TemplateService {
     @Transactional(readOnly = true)
     public TemplateListResponse getTemplates(Long userId) {
         return TemplateListResponse.builder()
-                .data(templateRepository.findByUser_UserId(userId)
+                .templates(templateRepository.findByUser_UserId(userId)
                         .stream()
                         .map(TemplateResponse::from)
                         .toList())
