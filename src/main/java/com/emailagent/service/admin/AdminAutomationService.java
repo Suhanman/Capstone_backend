@@ -23,7 +23,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,22 +37,20 @@ public class AdminAutomationService {
 
     /**
      * 전체 자동화 규칙 목록 조회 (user_id 선택 필터, 페이징)
-     * - keywords: AutomationRuleKeywords 테이블을 GROUP_CONCAT으로 합산 (N+1 방지)
      */
     @Transactional(readOnly = true)
     public AdminAutomationRuleListResponse getRules(Long userId, int page, int size) {
         Pageable pageable = PageRequest.of(page > 0 ? page - 1 : 0, size);
 
-        Page<Object[]> resultPage = (userId != null)
-                ? automationRuleRepository.findByUserIdWithKeywords(userId, pageable)
-                : automationRuleRepository.findAllWithKeywords(pageable);
+        Page<AutomationRule> resultPage = (userId != null)
+                ? automationRuleRepository.findByUserId(userId, pageable)
+                : automationRuleRepository.findAllRules(pageable);
 
         List<AdminAutomationRuleListResponse.RuleItem> items = resultPage.getContent().stream()
-                .map(row -> new AdminAutomationRuleListResponse.RuleItem(
-                        ((Number) row[0]).longValue(),           // rule_id
-                        ((Number) row[1]).longValue(),           // user_id
-                        (String) row[2],                         // keywords (GROUP_CONCAT 결과)
-                        ((Number) row[3]).intValue() == 1        // is_active (TINYINT → boolean)
+                .map(rule -> new AdminAutomationRuleListResponse.RuleItem(
+                        rule.getRuleId(),
+                        rule.getUser().getUserId(),
+                        rule.isActive()
                 ))
                 .collect(Collectors.toList());
 
@@ -68,7 +65,6 @@ public class AdminAutomationService {
         AutomationRule rule = automationRuleRepository.findDetailByRuleId(ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("자동화 규칙을 찾을 수 없습니다. ruleId=" + ruleId));
 
-        String keywords = String.join(", ", rule.getKeywords());
         Long templateId = rule.getTemplate() != null ? rule.getTemplate().getTemplateId() : null;
 
         return new AdminAutomationRuleDetailResponse(
@@ -76,7 +72,6 @@ public class AdminAutomationService {
                 rule.getUser().getUserId(),
                 rule.getCategory().getCategoryId(),
                 templateId,
-                keywords,
                 rule.isAutoSendEnabled(),
                 rule.isAutoCalendarEnabled(),
                 rule.isActive()
@@ -85,7 +80,6 @@ public class AdminAutomationService {
 
     /**
      * 자동화 규칙 생성 (관리자가 특정 사용자에게 규칙 할당)
-     * - keywords: 쉼표 구분 문자열 → List<String> 변환 후 저장
      */
     @Transactional
     public AdminAutomationRuleCreateResponse createRule(AdminAutomationRuleCreateRequest request) {
@@ -101,17 +95,10 @@ public class AdminAutomationService {
                     .orElseThrow(() -> new ResourceNotFoundException("템플릿을 찾을 수 없습니다. templateId=" + request.getTemplateId()));
         }
 
-        // 쉼표 구분 키워드 문자열 → List<String>
-        List<String> keywordList = Arrays.stream(request.getKeywords().split(","))
-                .map(String::trim)
-                .filter(k -> !k.isEmpty())
-                .collect(Collectors.toList());
-
         AutomationRule rule = AutomationRule.builder()
                 .user(user)
                 .category(category)
                 .template(template)
-                .keywords(keywordList)
                 .autoSendEnabled(request.getAutoSendEnabled())
                 .autoCalendarEnabled(request.getAutoCalendarEnabled())
                 .build();
@@ -129,15 +116,6 @@ public class AdminAutomationService {
         AutomationRule rule = automationRuleRepository.findById(ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("자동화 규칙을 찾을 수 없습니다. ruleId=" + ruleId));
 
-        // keywords: null이 아닐 때만 파싱하여 업데이트
-        List<String> keywordList = null;
-        if (request.getKeywords() != null) {
-            keywordList = Arrays.stream(request.getKeywords().split(","))
-                    .map(String::trim)
-                    .filter(k -> !k.isEmpty())
-                    .collect(Collectors.toList());
-        }
-
         // template: templateId가 있으면 조회, 없으면 null 유지
         Template template = null;
         if (request.getTemplateId() != null) {
@@ -145,7 +123,7 @@ public class AdminAutomationService {
                     .orElseThrow(() -> new ResourceNotFoundException("템플릿을 찾을 수 없습니다. templateId=" + request.getTemplateId()));
         }
 
-        rule.updateByAdmin(keywordList, template, request.getIsActive(), request.getAutoSendEnabled());
+        rule.updateByAdmin(template, request.getIsActive(), request.getAutoSendEnabled());
 
         return new AdminAutomationRuleUpdateResponse(rule.getRuleId());
     }

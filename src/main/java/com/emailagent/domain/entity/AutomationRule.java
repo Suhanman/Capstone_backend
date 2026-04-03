@@ -6,8 +6,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "AutomationRules")
@@ -36,14 +34,6 @@ public class AutomationRule {
     @JoinColumn(name = "template_id")
     private Template template;
 
-    // 키워드 목록: 별도 테이블(AutomationRuleKeywords)로 관리
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "AutomationRuleKeywords",
-                     joinColumns = @JoinColumn(name = "rule_id"))
-    @Column(name = "keyword", length = 100)
-    @Builder.Default
-    private List<String> keywords = new ArrayList<>();
-
     @Column(name = "auto_send_enabled", nullable = false)
     @Builder.Default
     private boolean autoSendEnabled = false;
@@ -66,11 +56,9 @@ public class AutomationRule {
 
     // ── 비즈니스 메서드 ──────────────────────────────────────────────────────────
 
-    public void update(Category category, Template template, List<String> keywords, boolean autoSendEnabled) {
+    public void update(Category category, Template template, boolean autoSendEnabled) {
         this.category = category;
         this.template = template;
-        this.keywords.clear();
-        this.keywords.addAll(keywords);
         this.autoSendEnabled = autoSendEnabled;
     }
 
@@ -83,12 +71,8 @@ public class AutomationRule {
     }
 
     // 관리자 PATCH: 선택 필드만 업데이트 (null이면 변경 안 함)
-    public void updateByAdmin(List<String> keywords, Template template,
+    public void updateByAdmin(Template template,
                                Boolean isActive, Boolean autoSendEnabled) {
-        if (keywords != null) {
-            this.keywords.clear();
-            this.keywords.addAll(keywords);
-        }
         if (template != null) {
             this.template = template;
         }

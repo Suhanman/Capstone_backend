@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 public class AdminAutomationRuleUpdateRequest {
 
     // 모든 필드 선택사항 — null이면 해당 필드 변경 안 함
-    private String keywords;
-
     @JsonProperty("template_id")
     private Long templateId;
 

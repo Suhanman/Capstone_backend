@@ -19,8 +19,6 @@ public class AdminAutomationRuleDetailResponse extends BaseResponse {
     @JsonProperty("template_id")
     private final Long templateId;
 
-    private final String keywords;
-
     @JsonProperty("auto_send_enabled")
     private final boolean autoSendEnabled;
 
@@ -31,14 +29,13 @@ public class AdminAutomationRuleDetailResponse extends BaseResponse {
     private final boolean active;
 
     public AdminAutomationRuleDetailResponse(long ruleId, long userId, long categoryId,
-                                              Long templateId, String keywords,
+                                              Long templateId,
                                               boolean autoSendEnabled, boolean autoCalendarEnabled,
                                               boolean active) {
         this.ruleId = ruleId;
         this.userId = userId;
         this.categoryId = categoryId;
         this.templateId = templateId;
-        this.keywords = keywords;
         this.autoSendEnabled = autoSendEnabled;
         this.autoCalendarEnabled = autoCalendarEnabled;
         this.active = active;
