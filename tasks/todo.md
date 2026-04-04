@@ -151,3 +151,47 @@ embedding 필드를 MariaDB VECTOR(384) 바이너리로 전환하고, 코사인 
 - 완료: 2026-04-02
 - 빌드: BUILD SUCCESS
 - embedding 저장 방식: JSON TEXT → MariaDB VECTOR(384) 바이너리 전환 완료
+
+---
+
+# RabbitMQ 파이프라인 전면 재설계 (RabbitMQ.md spec 기반)
+
+## 목표
+RabbitMQ.md spec에 따라 기존 임시 구현을 전면 교체:
+- 큐/Exchange 이름 Terraform 관리 기준으로 정렬
+- passive 선언 전환 (Spring이 RabbitMQ 리소스 생성 불가)
+- rabbitMQ / sse 패키지 분리
+- SKIP LOCKED 기반 분산 폴링
+- SSE 연동 (@Profile("sse") 적용)
+- Draft 파이프라인 제외
+
+## 체크리스트
+
+### Phase 0: 기존 파일 정리
+- [ ] config/RabbitMQConfig.java — 삭제 (rabbitmq/config로 이전)
+- [ ] controller/EmailController.java — 삭제 (git D 상태, 정리)
+- [ ] messaging/* 구 파일들 — 삭제 (git D 상태, 정리)
+- [ ] service/EmailService.java — 삭제 (git D 상태, 정리)
+
+### Phase 1: 설정 파일 수정
+- [ ] application.yml — exchange/queue 이름 변경 + sse pod URL 추가
+- [ ] OutboxRepository.java — SKIP LOCKED 네이티브 쿼리 추가
+
+### Phase 2: rabbitmq 패키지 신규 생성
+- [ ] rabbitmq/config/RabbitMQConfig.java — passive 선언 + Publisher Confirms + RabbitAdmin
+- [ ] rabbitmq/dto/OutboxPayloadDTO.java — Outbox → Queue 직렬화 DTO
+- [ ] rabbitmq/dto/ClassifyResultDTO.java — AI 응답 역직렬화 DTO
+- [ ] rabbitmq/publisher/MailPublisher.java — x.app2ai.direct 발행 + CorrelationData + ConfirmCallback
+- [ ] rabbitmq/consumer/MailConsumer.java — q.2app.classify 수신, x-death count 기반 ack/nack
+- [ ] rabbitmq/scheduler/MailScheduler.java — 10s 폴링 + 30min 타임아웃 롤백
+- [ ] rabbitmq/service/MailService.java — 인터페이스
+- [ ] rabbitmq/service/MailServiceImpl.java — 트랜잭션 관리 + 상태 전이 + SSE 브로드캐스트
+- [ ] rabbitmq/controller/MailController.java — 관리자 Job 조회/삭제 API
+
+### Phase 3: sse 패키지 신규 생성 (@Profile("sse"))
+- [ ] sse/service/SseEmitterService.java — emitter 목록 관리
+- [ ] sse/controller/SSEController.java — GET /api/mail/stream
+- [ ] sse/controller/InternalSSEController.java — POST /internal/sse/push
+
+### Phase 4: 빌드 확인
+- [ ] mvn compile 성공

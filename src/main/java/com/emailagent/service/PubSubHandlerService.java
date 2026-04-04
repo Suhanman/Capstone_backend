@@ -197,7 +197,10 @@ public class PubSubHandlerService {
         emailRepository.save(email);
 
         // ③ 6단계: AI 서버 전송용 payload JSON 구성 (규격 준수)
+        // Outbox 패턴: payload만으로 MQ 발행이 완결되도록 email_id, sender_name 포함
         ObjectNode payloadNode = objectMapper.createObjectNode();
+        payloadNode.put("email_id",      email.getEmailId());  // Outbox폴링만으로 식별 가능
+        payloadNode.put("sender_name",   senderName);           // Email 엔티티 접근 불필요
         payloadNode.put("messageId",     messageId);
         payloadNode.put("threadId",      message.getThreadId());
         payloadNode.put("subject",       subject);
