@@ -1,5 +1,6 @@
 package com.emailagent.rabbitmq.consumer;
 
+import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.config.RabbitMQConfig;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
 import com.emailagent.rabbitmq.service.MailService;
@@ -8,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -33,9 +35,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MailConsumer {
 
-    private static final int MAX_RETRY_COUNT = 3;
 
     private final MailService mailService;
+    private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(
             queues = RabbitMQConfig.QUEUE_CLASSIFY_RESULT,
@@ -51,10 +53,12 @@ public class MailConsumer {
             // x-death 헤더에서 재시도 횟수 읽기
             int retryCount = extractRetryCount(message);
 
-            if (retryCount >= MAX_RETRY_COUNT) {
-                // 최대 재시도 초과 → FAILED 처리 후 ack (q.dlx.failed로 이동은 Terraform DLX 설정이 처리)
+            if (retryCount >= OutboxPolicy.MAX_RETRY) {
+                // 최대 재시도 초과 → FAILED 처리 후 원본 메시지를 q.dlx.failed에 수동 퍼블리시
+                // basicAck로 현재 큐에서 제거하고, RabbitTemplate으로 q.dlx.failed에 직접 전송
                 log.error("[MailConsumer] 최대 재시도 초과 → FAILED — outboxId={}, retryCount={}", outboxId, retryCount);
                 mailService.markFailed(outboxId, "Max retry exceeded: " + retryCount);
+                rabbitTemplate.send(RabbitMQConfig.QUEUE_DLX_FAILED, message);
                 channel.basicAck(deliveryTag, false);
                 return;
             }
