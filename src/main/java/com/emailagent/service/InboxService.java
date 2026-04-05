@@ -16,7 +16,7 @@ import com.emailagent.dto.response.inbox.InboxListResponse;
 import com.emailagent.dto.response.inbox.RegenerateResponse;
 import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
-import com.emailagent.messaging.EmailMessagePublisher;
+import com.emailagent.rabbitmq.publisher.MailPublisher;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +45,7 @@ public class InboxService {
     private final IntegrationRepository integrationRepository;
     private final EmailAnalysisResultRepository emailAnalysisResultRepository;
     private final BusinessProfileRepository businessProfileRepository;
-    private final EmailMessagePublisher emailMessagePublisher;
+    private final MailPublisher mailPublisher;
     private final BusinessService businessService;
     private final GmailApiService gmailApiService;
 
@@ -145,18 +145,18 @@ public class InboxService {
                 .orElse(null);
 
         // 5. email.draft 큐로 재생성 요청 발행 (mode="regenerate")
-        emailMessagePublisher.publishDraftRequest(
-                emailId,
-                email.getSubject(),
-                email.getBodyClean(),
-                ar.getDomain(),
-                ar.getIntent(),
-                ar.getSummaryText(),
-                emailTone,
-                ragContext,
-                request.getPreviousDraft(),
-                "regenerate"
-        );
+//        mailPublisher.publishDraftRequest(
+//                emailId,
+//                email.getSubject(),
+//                email.getBodyClean(),
+//                ar.getDomain(),
+//                ar.getIntent(),
+//                ar.getSummaryText(),
+//                emailTone,
+//                ragContext,
+//                request.getPreviousDraft(),
+//                "regenerate"
+//        );
 
         // 6. DraftReply status → PENDING_REVIEW로 초기화
         draftReplyRepository.findByEmailIdAndUserId(emailId, userId)

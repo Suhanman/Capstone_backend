@@ -91,12 +91,15 @@ public class EmailAnalysisResult {
      * emailEmbedding: float[] (MariaDB VECTOR(384) 바이너리로 저장)
      */
     public void updateFromClassify(String domain, String intent, BigDecimal confidenceScore,
-                                   String summaryText, boolean scheduleDetected, float[] emailEmbedding) {
+                                   String summaryText, boolean scheduleDetected, float[] emailEmbedding,
+                                   Map<String, Object> entitiesJson, String modelVersion) {
         this.domain = domain;
         this.intent = intent;
         this.confidenceScore = confidenceScore;
         this.summaryText = summaryText;
         this.scheduleDetected = scheduleDetected;
         this.emailEmbedding = emailEmbedding;
+        this.entitiesJson = entitiesJson;
+        this.modelVersion = modelVersion;
     }
 }

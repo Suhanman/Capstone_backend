@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:mariadb://localhost:3308/email_agent?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:root1234}
+    url: jdbc:mariadb://192.168.3.10:3306/email_agent?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:capstone}
+    password: ${DB_PASSWORD:capstone}
     driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
@@ -14,10 +14,11 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MariaDBDialect
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: 5672
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASS:guest}
+    host: ${RABBITMQ_HOST:192.168.2.20}
+    port: 30672
+    username: ${RABBITMQ_USER:admin}
+    password: ${RABBITMQ_PASS:admin1234!}
+    virtual-host: /
 
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-change-in-production}
@@ -28,17 +29,27 @@ app:
   file:
     upload-dir: C:/dev/uploads   # 파일 업로드 저장 경로
   rabbitmq:
-    exchange: email.exchange
+    exchange:
+      app2ai: x.app2ai.direct
+      ai2app: x.ai2app.direct
     queue:
-      classify: email.classify
-      draft: email.draft
+      classify-inbound: q.2ai.classify
+      classify-result: q.2app.classify
+      draft-inbound: q.2ai.draft
+      draft-result: q.2app.draft
+      dlx-failed: q.dlx.failed
     routing-key:
-      classify: email.classify
-      draft: email.draft
+      classify-inbound: 2ai.classify
+      classify-result: 2app.classify
+      draft-inbound: 2ai.draft
+      draft-result: 2app.draft
 
   ai:
     server-url: ${AI_SERVER_URL:http://localhost:8000}
     api-key: ${AI_API_KEY:}
+
+  sse:
+    pods: ${SSE_POD_0_URL:http://localhost:8080},${SSE_POD_1_URL:http://localhost:8081}
 
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
@@ -55,5 +66,6 @@ server:
 
 logging:
   level:
-    com.email-agent: DEBUG
+    com.emailagent: DEBUG
+    com.emailagent.rabbitmq: DEBUG
     org.springframework.security: INFO

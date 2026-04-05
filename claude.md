@@ -84,6 +84,12 @@
 - 담당 API: /api/integrations/**, /api/auth/**
 - 위 핵심 아키텍처 및 인증 룰 참고
 
+## 메시지 파이프라인 연동 담당
+- 담당 md : RabbitMQ.md , draft.md, infra.md
+- 1번 : 서비스 CRUD 및 Google OAuth, Gmail 연동 등의 비즈니스 로직에 일체 간섭하지 않는다.
+- 2번 : 부득이하게 2번을 어겨야 할경우 반드시 검토받는다.
+
+
 # 워크플로우 원칙 
 
 ## 1. 플랜 모드 기본화
