@@ -42,6 +42,6 @@ public class NotificationResponse {
     @Getter
     @Builder
     public static class ListResponse extends BaseResponse {
-        private List<NotificationResponse> data;
+        private List<NotificationResponse> notifications;
     }
 }

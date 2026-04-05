@@ -10,5 +10,5 @@ import java.util.List;
 @Builder
 public class CalendarEventListResponse extends BaseResponse {
 
-    private List<CalendarEventResponse> data;
+    private List<CalendarEventResponse> events;
 }

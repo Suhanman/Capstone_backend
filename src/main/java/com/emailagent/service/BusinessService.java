@@ -66,7 +66,7 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public BusinessResourceListResponse getFiles(Long userId) {
         return BusinessResourceListResponse.builder()
-                .data(resourceRepository.findByUser_UserId(userId)
+                .resources(resourceRepository.findByUser_UserId(userId)
                         .stream()
                         .map(BusinessResourceResponse::from)
                         .toList())
@@ -123,7 +123,7 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public FaqListResponse getFaqs(Long userId) {
         return FaqListResponse.builder()
-                .data(faqRepository.findByUser_UserId(userId)
+                .faqs(faqRepository.findByUser_UserId(userId)
                         .stream()
                         .map(FaqResponse::from)
                         .toList())
@@ -167,7 +167,7 @@ public class BusinessService {
     @Transactional(readOnly = true)
     public CategoryListResponse getCategories(Long userId) {
         return CategoryListResponse.builder()
-                .data(categoryRepository.findByUser_UserId(userId)
+                .categories(categoryRepository.findByUser_UserId(userId)
                         .stream()
                         .map(CategoryResponse::from)
                         .toList())

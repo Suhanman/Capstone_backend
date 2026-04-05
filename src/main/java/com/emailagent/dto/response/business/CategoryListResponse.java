@@ -10,5 +10,5 @@ import java.util.List;
 @Builder
 public class CategoryListResponse extends BaseResponse {
 
-    private List<CategoryResponse> data;
+    private List<CategoryResponse> categories;
 }

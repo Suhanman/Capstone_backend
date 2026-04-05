@@ -3,7 +3,9 @@ package com.emailagent.service;
 import com.emailagent.domain.entity.*;
 import com.emailagent.domain.enums.DraftStatus;
 import com.emailagent.domain.enums.EmailStatus;
+import com.emailagent.dto.inbox.AttachmentMetaDto;
 import com.emailagent.dto.request.inbox.CalendarActionRequest;
+import com.emailagent.dto.response.inbox.AttachmentResponseDto;
 import com.emailagent.dto.request.inbox.RegenerateRequest;
 import com.emailagent.dto.request.inbox.ReplyActionRequest;
 import com.emailagent.dto.response.inbox.AttachmentDownloadResult;
@@ -29,6 +31,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -39,7 +43,6 @@ public class InboxService {
     private final CalendarEventRepository calendarEventRepository;
     private final UserRepository userRepository;
     private final IntegrationRepository integrationRepository;
-    private final EmailAttachmentRepository emailAttachmentRepository;
     private final EmailAnalysisResultRepository emailAnalysisResultRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final EmailMessagePublisher emailMessagePublisher;
@@ -82,12 +85,21 @@ public class InboxService {
 
         EmailAnalysisResult ar = email.getAnalysisResult();
 
+        // attachments_meta → 프론트 전달용 DTO 변환 (gmail_attachment_id 제외)
+        List<AttachmentResponseDto> attachments = email.getAttachmentsMeta() != null
+                ? email.getAttachmentsMeta().stream()
+                        .map(AttachmentResponseDto::from)
+                        .toList()
+                : List.of();
+
         EmailInfo emailInfo = EmailInfo.builder()
                 .emailId(email.getEmailId())
                 .senderName(email.getSenderName())
                 .subject(email.getSubject())
                 .body(email.getBodyClean())
                 .receivedAt(email.getReceivedAt())
+                .hasAttachments(email.isHasAttachments())
+                .attachments(attachments)
                 .build();
 
         AiAnalysis aiAnalysis = (ar != null) ? AiAnalysis.builder()
@@ -256,33 +268,38 @@ public class InboxService {
 
     // =============================================
     // GET /api/inbox/{email_id}/attachments/{attachment_id}
-    // 첨부파일 다운로드
+    // 첨부파일 On-demand 다운로드
     // =============================================
 
     @Transactional(readOnly = true)
-    public AttachmentDownloadResult downloadAttachment(Long userId, Long emailId, Long attachmentId) {
-        // 1. 이메일 조회 — userId로 본인 소유 여부 검증, Gmail messageId 확보
+    public AttachmentDownloadResult downloadAttachment(Long userId, Long emailId, int attachmentId) {
+        // 1. 이메일 조회 — userId로 본인 소유 여부 검증, Gmail messageId(externalMsgId) 확보
         Email email = findEmailForUser(emailId, userId);
 
-        // 2. 첨부파일 조회 — email_id + attachment_id 조합으로 소유 검증
-        EmailAttachment attachment = emailAttachmentRepository
-                .findByAttachmentIdAndEmail_EmailId(attachmentId, emailId)
+        // 2. attachments_meta JSON에서 1-based 시퀀스 attachment_id로 메타데이터 조회
+        //    attachment_id(int, 우리 API 식별자) → gmail_attachment_id(String, Gmail API 식별자)
+        List<AttachmentMetaDto> metaList = email.getAttachmentsMeta() != null
+                ? email.getAttachmentsMeta() : emptyList();
+
+        AttachmentMetaDto meta = metaList.stream()
+                .filter(m -> m.getAttachmentId() == attachmentId)
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("첨부파일을 찾을 수 없습니다."));
 
-        // 3. Gmail API 호출: externalMsgId + externalAttachmentId로 바이트 취득
+        // 3. Gmail API 호출: externalMsgId + gmail_attachment_id(String)로 바이트 취득
         //    gmailApiService 내부에서 Base64URL 디코딩 처리
         byte[] data = gmailApiService.getAttachmentBytes(
                 userId,
                 email.getExternalMsgId(),
-                attachment.getExternalAttachmentId()
+                meta.getGmailAttachmentId()
         );
 
-        // 4. DB에서 조회한 원본 파일명과 MIME 타입을 함께 반환 (응답 헤더 세팅에 사용)
-        String mimeType = attachment.getMimeType() != null
-                ? attachment.getMimeType()
+        // 4. attachments_meta에 저장된 원본 파일명과 MIME 타입을 함께 반환 (응답 헤더 세팅에 사용)
+        String mimeType = meta.getContentType() != null
+                ? meta.getContentType()
                 : "application/octet-stream";
 
-        return new AttachmentDownloadResult(data, attachment.getFileName(), mimeType);
+        return new AttachmentDownloadResult(data, meta.getFileName(), mimeType);
     }
 
     // =============================================

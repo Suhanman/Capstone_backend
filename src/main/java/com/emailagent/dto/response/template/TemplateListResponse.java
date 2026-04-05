@@ -10,5 +10,5 @@ import java.util.List;
 @Builder
 public class TemplateListResponse extends BaseResponse {
 
-    private List<TemplateResponse> data;
+    private List<TemplateResponse> templates;
 }

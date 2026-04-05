@@ -92,7 +92,7 @@ public class DashboardService {
                 .toList();
 
         return ScheduleResponse.builder()
-                .data(items)
+                .schedules(items)
                 .build();
     }
 
@@ -164,7 +164,7 @@ public class DashboardService {
                 .toList();
 
         return RecentEmailResponse.builder()
-                .data(items)
+                .emails(items)
                 .build();
     }
 

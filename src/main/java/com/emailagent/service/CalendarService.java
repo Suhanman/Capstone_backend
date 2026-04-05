@@ -35,7 +35,7 @@ public class CalendarService {
     @Transactional(readOnly = true)
     public CalendarEventListResponse getEvents(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
         return CalendarEventListResponse.builder()
-                .data(calendarEventRepository.findByPeriod(userId, startDate, endDate)
+                .events(calendarEventRepository.findByPeriod(userId, startDate, endDate)
                         .stream()
                         .map(CalendarEventResponse::from)
                         .toList())

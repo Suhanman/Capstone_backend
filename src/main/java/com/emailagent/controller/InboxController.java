@@ -82,7 +82,7 @@ public class InboxController {
     public ResponseEntity<byte[]> downloadAttachment(
             @CurrentUser Long userId,
             @PathVariable Long emailId,
-            @PathVariable Long attachmentId) {
+            @PathVariable int attachmentId) {
         AttachmentDownloadResult result = inboxService.downloadAttachment(userId, emailId, attachmentId);
 
         // 한글 파일명 깨짐 방지: RFC 5987 방식 (filename*=UTF-8''인코딩값)

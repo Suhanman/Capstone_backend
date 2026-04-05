@@ -1,13 +1,16 @@
 package com.emailagent.domain.entity;
 
+import com.emailagent.converter.AttachmentMetaConverter;
 import com.emailagent.domain.enums.EmailStatus;
 import com.emailagent.domain.enums.ImportanceLevel;
+import com.emailagent.dto.inbox.AttachmentMetaDto;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "emails")
@@ -57,6 +60,16 @@ public class Email {
     @Builder.Default
     private ImportanceLevel importanceLevel = ImportanceLevel.MEDIUM;
 
+    /** 첨부파일 유무 플래그 */
+    @Column(name = "has_attachments", nullable = false)
+    @Builder.Default
+    private boolean hasAttachments = false;
+
+    /** 첨부파일 메타데이터 배열 (attachment_id 시퀀스 → gmail_attachment_id 매핑 포함) */
+    @Convert(converter = AttachmentMetaConverter.class)
+    @Column(name = "attachments_meta", columnDefinition = "JSON")
+    private List<AttachmentMetaDto> attachmentsMeta;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -76,5 +89,11 @@ public class Email {
 
     public void updateImportance(ImportanceLevel level) {
         this.importanceLevel = level;
+    }
+
+    /** 첨부파일 메타데이터 일괄 세팅 (PubSub 파이프라인에서 Email 저장 후 호출) */
+    public void updateAttachmentMeta(boolean hasAttachments, List<AttachmentMetaDto> attachmentsMeta) {
+        this.hasAttachments = hasAttachments;
+        this.attachmentsMeta = attachmentsMeta;
     }
 }
