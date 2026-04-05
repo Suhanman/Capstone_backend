@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "EmailAnalysisResults")
+@Table(name = "email_analysis_results")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor

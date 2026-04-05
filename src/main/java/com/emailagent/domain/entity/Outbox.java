@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "Outbox",
+@Table(name = "outbox",
        indexes = {
            @Index(name = "idx_outbox_status", columnList = "status"),
            @Index(name = "idx_outbox_email_id", columnList = "email_id"),

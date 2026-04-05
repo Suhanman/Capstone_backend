@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "Categories",
+@Table(name = "categories",
        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "category_name"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

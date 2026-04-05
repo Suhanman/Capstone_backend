@@ -37,6 +37,14 @@ public class TemplateService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public TemplateResponse getTemplate(Long templateId, Long userId) {
+        return templateRepository.findById(templateId)
+                .filter(t -> t.getUser().getUserId().equals(userId))
+                .map(TemplateResponse::from)
+                .orElseThrow(() -> new TemplateNotFoundException(templateId));
+    }
+
     @Transactional
     public TemplateResponse createTemplate(Long userId, TemplateCreateRequest request) {
         User user = userRepository.findById(userId)

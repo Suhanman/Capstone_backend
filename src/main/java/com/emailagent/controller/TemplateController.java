@@ -25,6 +25,13 @@ public class TemplateController {
         return ResponseEntity.ok(templateService.getTemplates(userId));
     }
 
+    @GetMapping("/{templateId}")
+    public ResponseEntity<TemplateResponse> getTemplate(
+            @PathVariable Long templateId,
+            @CurrentUser Long userId) {
+        return ResponseEntity.ok(templateService.getTemplate(templateId, userId));
+    }
+
     @PostMapping
     public ResponseEntity<TemplateResponse> createTemplate(
             @CurrentUser Long userId,
