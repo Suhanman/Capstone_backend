@@ -2,11 +2,9 @@ package com.emailagent.repository;
 
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.enums.OutboxStatus;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,7 +20,7 @@ public interface OutboxRepository extends JpaRepository<Outbox, Long> {
      * 분산 Pod 환경에서 중복 폴링 방지: SKIP LOCKED
      * 다른 Pod가 잠근 행은 건너뛰고, 이 Pod가 처리할 수 있는 READY 항목만 가져옴
      */
-    @Query(value = "SELECT * FROM Outbox WHERE status = 'READY' ORDER BY created_at LIMIT :limit FOR UPDATE SKIP LOCKED",
+    @Query(value = "SELECT * FROM outbox WHERE status = 'READY' ORDER BY created_at LIMIT :limit FOR UPDATE SKIP LOCKED",
            nativeQuery = true)
     List<Outbox> findReadyWithSkipLocked(@Param("limit") int limit);
 
@@ -33,11 +31,11 @@ public interface OutboxRepository extends JpaRepository<Outbox, Long> {
      */
     @Modifying
     @Query(value = """
-            UPDATE Outbox
+            UPDATE outbox
             SET status = 'SENDING', sent_at = NOW()
             WHERE outbox_id IN (
                 SELECT outbox_id FROM (
-                    SELECT outbox_id FROM Outbox
+                    SELECT outbox_id FROM outbox
                     WHERE status = 'READY'
                     ORDER BY created_at ASC
                     LIMIT :limit
@@ -52,7 +50,7 @@ public interface OutboxRepository extends JpaRepository<Outbox, Long> {
      * markAsSendingBatch()에서 updateReadyToSending() 후 반환할 항목 조회용
      */
     @Query(value = """
-            SELECT * FROM Outbox
+            SELECT * FROM outbox
             WHERE status = 'SENDING'
             AND sent_at > DATE_SUB(NOW(), INTERVAL 1 SECOND)
             ORDER BY sent_at DESC
