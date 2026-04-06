@@ -1,9 +1,9 @@
-# 1. Users
+# 1. users
 
 서비스의 **기본 사용자 계정 정보**를 저장하는 테이블
 
 ```sql
-CREATE TABLE Users (
+CREATE TABLE users (
     user_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 사용자 ID
     email VARCHAR(255) NOT NULL UNIQUE, -- 로그인 이메일
     password VARCHAR(255) NOT NULL, -- 로그인 비밀번호
@@ -17,12 +17,12 @@ CREATE TABLE Users (
 );
 ```
 
-# 2. Integrations
+# 2. integrations
 
 사용자가 연결한 **외부 계정 연동 정보**를 저장하는 테이블
 
 ```sql
-CREATE TABLE Integrations (
+CREATE TABLE integrations (
     integration_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 연동 ID
     user_id BIGINT NOT NULL UNIQUE, -- 사용자 1명당 Google 계정 연동 1건
     provider VARCHAR(50) NOT NULL DEFAULT 'GOOGLE', -- 연동 제공자
@@ -44,15 +44,15 @@ CREATE TABLE Integrations (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
     
     CONSTRAINT fk_integrations_user
-      FOREIGN KEY (user_id) REFERENCES Users(user_id)
+      FOREIGN KEY (user_id) REFERENCES users(user_id)
           ON DELETE CASCADE
 );
 ```
 
-# 3. BusinessProfiles
+# 3. business_profiles
 
 ```sql
-CREATE TABLE BusinessProfiles (
+CREATE TABLE business_profiles (
     profile_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 프로필 ID
     user_id BIGINT NOT NULL UNIQUE, -- 사용자 ID
     industry_type VARCHAR(100), -- 업종 유형
@@ -63,17 +63,17 @@ CREATE TABLE BusinessProfiles (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_businessprofiles_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 4. BusinessResources
+# 4. business_resources
 
 AI가 참고할 **비즈니스 자료**를 저장하는 테이블
 
 ```sql
-CREATE TABLE BusinessResources (
+CREATE TABLE business_resources (
     resource_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 자료 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     title VARCHAR(255), -- 자료 제목
@@ -86,15 +86,15 @@ CREATE TABLE BusinessResources (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_businessresources_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 5. BusinessFAQs
+# 5. business_faqs
 
 ```sql
-CREATE TABLE BusinessFAQs (
+CREATE TABLE business_faqs (
     faq_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- FAQ ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     question VARCHAR(500) NOT NULL, -- 질문
@@ -104,15 +104,15 @@ CREATE TABLE BusinessFAQs (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_businessfaqs_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 6. Categories
+# 6. categories
 
 ```sql
-CREATE TABLE Categories (
+CREATE TABLE categories (
     category_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 카테고리 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_name VARCHAR(100) NOT NULL, -- 카테고리명
@@ -123,17 +123,17 @@ CREATE TABLE Categories (
     CONSTRAINT uq_categories_user_name
         UNIQUE (user_id, category_name),
     CONSTRAINT fk_categories_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 7. Templates
+# 7. templates
 
 카테고리 별로 사용할 **답장 템플릿**을 저장하는 테이블
 
 ```sql
-CREATE TABLE Templates (
+CREATE TABLE templates (
     template_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 템플릿 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_id BIGINT NOT NULL, -- 카테고리 ID
@@ -146,20 +146,20 @@ CREATE TABLE Templates (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_templates_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_templates_category
-        FOREIGN KEY (category_id) REFERENCES Categories(category_id)
+        FOREIGN KEY (category_id) REFERENCES categories(category_id)
         ON DELETE CASCADE
 );
 ```
 
-# 8. Emails
+# 8. emails
 
 사용자가 받은 **이메일 원문과 분석 결과를 함께 저장하는 테이블**
 
 ```sql
-CREATE TABLE Emails (
+CREATE TABLE emails (
     email_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     external_msg_id VARCHAR(128) NOT NULL UNIQUE,
@@ -183,15 +183,15 @@ CREATE TABLE Emails (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_emails_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 9. TemplateUsageLogs
+# 9. template_usage_logs
 
 ```sql
-CREATE TABLE TemplateUsageLogs (
+CREATE TABLE template_usage_logs (
     usage_log_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 로그 ID
     template_id BIGINT NOT NULL, -- 템플릿 ID
     email_id BIGINT, -- 이메일 ID
@@ -202,21 +202,21 @@ CREATE TABLE TemplateUsageLogs (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
 
     CONSTRAINT fk_templateusagelogs_template
-        FOREIGN KEY (template_id) REFERENCES Templates(template_id)
+        FOREIGN KEY (template_id) REFERENCES templates(template_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_templateusagelogs_email
-        FOREIGN KEY (email_id) REFERENCES Emails(email_id)
+        FOREIGN KEY (email_id) REFERENCES emails(email_id)
         ON DELETE SET NULL,
     CONSTRAINT fk_templateusagelogs_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 10. EmailAnalysisResults
+# 10. email_analysis_results
 
 ```sql
-CREATE TABLE EmailAnalysisResults (
+CREATE TABLE email_analysis_results (
     analysis_result_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 분석 결과 ID
     email_id BIGINT NOT NULL UNIQUE, -- 이메일 ID
     category_id BIGINT, -- 카테고리 ID
@@ -232,54 +232,54 @@ CREATE TABLE EmailAnalysisResults (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_emailanalysisresults_email
-        FOREIGN KEY (email_id) REFERENCES Emails(email_id)
+        FOREIGN KEY (email_id) REFERENCES emails(email_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_emailanalysisresults_category
-        FOREIGN KEY (category_id) REFERENCES Categories(category_id)
+        FOREIGN KEY (category_id) REFERENCES categories(category_id)
         ON DELETE SET NULL
 );
 ```
 
-# 11. CalendarEvents
+# 11. calendar_events
 
 캘린더 화면에 표시될 **일정 정보**를 저장하는 테이블
 
 ```sql
-CREATE TABLE CalendarEvents (
-    calendar_event_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 일정 ID
-    user_id BIGINT NOT NULL, -- 사용자 ID
-    email_id BIGINT NULL, -- 이메일 ID
+CREATE TABLE calendar_events (
+     event_id BIGINT AUTO_INCREMENT PRIMARY KEY,          -- 일정 ID
+     user_id BIGINT NOT NULL,                             -- 사용자 ID
+     email_id BIGINT NULL,                                -- 이메일 ID
+     google_event_id VARCHAR(255) NULL,                   -- 구글 캘린더 API 연동용 ID
 
-    title VARCHAR(255) NOT NULL, -- 일정 제목
-    start_datetime DATETIME NOT NULL, -- 시작 일시
-    end_datetime DATETIME, -- 종료 일시
-    location VARCHAR(255), -- 일정 장소
-    participants VARCHAR(500), -- 참석자 정보
-    event_type VARCHAR(50), -- 일정 유형 (예: 대면 미팅, 화상 회의 등)
-    description TEXT, -- 메모 및 상세 내용
-    
-    source ENUM('EMAIL', 'MANUAL', 'SYNC') NOT NULL DEFAULT 'EMAIL', -- 생성 출처
-    status ENUM('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED') NOT NULL DEFAULT 'PENDING', -- 일정 상태
-    is_calendar_added TINYINT(1) NOT NULL DEFAULT 0, -- 캘린더 등록 여부
+     title VARCHAR(255) NOT NULL,                         -- 일정 제목
+     start_datetime DATETIME NOT NULL,                    -- 시작 일시
+     end_datetime DATETIME,                               -- 종료 일시
 
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
+     location VARCHAR(255),                               -- 장소 또는 회의 링크
+     event_type ENUM('meeting', 'video', 'call', 'deadline'), -- 일정 유형
+     description TEXT,                                    -- 메모 및 상세 내용
 
-    CONSTRAINT fk_calendarevents_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_calendarevents_email
-        FOREIGN KEY (email_id) REFERENCES Emails(email_id)
-        ON DELETE SET NULL
-);
+     source ENUM('EMAIL', 'MANUAL', 'SYNC') NOT NULL DEFAULT 'EMAIL', -- 생성 출처
+     status ENUM('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED') NOT NULL DEFAULT 'PENDING', -- 일정 상태
+     is_calendar_added TINYINT(1) NOT NULL DEFAULT 0,     -- 구글 캘린더 등록 여부
+
+     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+-- 외래키 제약 조건 (이름을 명시적으로 지정하여 관리 용이성 확보)
+     CONSTRAINT fk_calendar_user FOREIGN KEY (user_id)
+         REFERENCES users(user_id) ON DELETE CASCADE,
+     CONSTRAINT fk_calendar_email FOREIGN KEY (email_id)
+         REFERENCES emails(email_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-# 12. DraftReplies
+# 12. draft_replies
 
 이메일에 대해 생성된 **답장 초안**을 저장하는 테이블
 
 ```sql
-CREATE TABLE DraftReplies (
+CREATE TABLE draft_replies (
     draft_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 초안 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     email_id BIGINT NOT NULL, -- 이메일 ID
@@ -294,23 +294,23 @@ CREATE TABLE DraftReplies (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_draftreplies_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_draftreplies_email
-        FOREIGN KEY (email_id) REFERENCES Emails(email_id)
+        FOREIGN KEY (email_id) REFERENCES emails(email_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_draftreplies_template
-        FOREIGN KEY (template_id) REFERENCES Templates(template_id)
+        FOREIGN KEY (template_id) REFERENCES templates(template_id)
         ON DELETE SET NULL
 );
 ```
 
-# 13. AutomationRules
+# 13. automation_rules
 
 사용자가 설정한 **자동화 규칙**을 저장하는 테이블
 
 ```sql
-CREATE TABLE AutomationRules (
+CREATE TABLE automation_rules (
     rule_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 규칙 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_id BIGINT NOT NULL, -- 카테고리 ID
@@ -324,23 +324,23 @@ CREATE TABLE AutomationRules (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_automationrules_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_automationrules_category
-        FOREIGN KEY (category_id) REFERENCES Categories(category_id)
+        FOREIGN KEY (category_id) REFERENCES categories(category_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_automationrules_template
-        FOREIGN KEY (template_id) REFERENCES Templates(template_id)
+        FOREIGN KEY (template_id) REFERENCES templates(template_id)
         ON DELETE SET NULL
 );
 ```
 
-# 14. Notifications
+# 14. notifications
 
 사용자에게 보여줄 **알림 정보**를 저장하는 테이블
 
 ```sql
-CREATE TABLE Notifications (
+CREATE TABLE notifications (
     notification_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 알림 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
 
@@ -361,17 +361,17 @@ CREATE TABLE Notifications (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
 
     CONSTRAINT fk_notifications_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
 
-# 15. SupportTickets
+# 15. support_tickets
 
 사용자가 관리자에게 보내는 **문의와 답변**을 저장하는 테이블
 
 ```sql
-CREATE TABLE SupportTickets (
+CREATE TABLE support_tickets (
     ticket_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 문의 ID
     user_id BIGINT NOT NULL, -- 사용자 ID
 
@@ -387,18 +387,18 @@ CREATE TABLE SupportTickets (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
 
     CONSTRAINT fk_supporttickets_user
-        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_supporttickets_admin
-        FOREIGN KEY (replied_by) REFERENCES Users(user_id)
+        FOREIGN KEY (replied_by) REFERENCES users(user_id)
         ON DELETE SET NULL
 );
 ```
 
-# 16. Outbox
+# 16. outbox
 
 메시지 큐(RabbitMQ) 기반 AI 파이프라인의 데이터 전송 상태를 추적하고, 관리자 모니터링 및 전송 실패 시 재시도를 관리하는 테이블
-CREATE TABLE Outbox (
+CREATE TABLE outbox (
     outbox_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 아웃박스 ID
     email_id BIGINT NOT NULL, -- 이메일 ID
 
@@ -413,7 +413,7 @@ CREATE TABLE Outbox (
     finished_at DATETIME NULL, -- 처리 완료 일시 (FINISH 전환 시각)
 
     CONSTRAINT fk_outbox_email
-        FOREIGN KEY (email_id) REFERENCES Emails(email_id)
+        FOREIGN KEY (email_id) REFERENCES emails(email_id)
         ON DELETE CASCADE,
 
     -- 모니터링 및 상태 폴링(Polling)을 위한 인덱스 최적화

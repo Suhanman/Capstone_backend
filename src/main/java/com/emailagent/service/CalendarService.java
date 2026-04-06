@@ -71,6 +71,9 @@ public class CalendarService {
                 .title(request.getTitle())
                 .startDatetime(request.getStartDatetime())
                 .endDatetime(request.getEndDatetime())
+                .eventType(request.getEventType())
+                .location(request.getLocation())
+                .description(request.getNotes())
                 .source("MANUAL")
                 .status("CONFIRMED")
                 .isCalendarAdded(true)
@@ -115,7 +118,8 @@ public class CalendarService {
     public CalendarEventDetailResponse updateEvent(Long userId, Long eventId, CalendarEventRequest request) {
         CalendarEvent event = findEventForUser(eventId, userId);
 
-        event.update(request.getTitle(), request.getStartDatetime(), request.getEndDatetime());
+        event.update(request.getTitle(), request.getStartDatetime(), request.getEndDatetime(),
+                request.getEventType(), request.getLocation(), request.getNotes());
 
         // Google Calendar에 등록된 일정만 API로 수정 (googleEventId 있을 때만)
         if (event.isCalendarAdded() && event.getGoogleEventId() != null) {

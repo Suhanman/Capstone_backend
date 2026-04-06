@@ -195,3 +195,22 @@ RabbitMQ.md spec에 따라 기존 임시 구현을 전면 교체:
 
 ### Phase 4: 빌드 확인
 - [ ] mvn compile 성공
+
+---
+
+# 캘린더 스펙 확장 (calendar.md 기반)
+
+## 목표
+DB 수정사항 및 프론트 UI 스펙에 맞춰 캘린더 백엔드 확장
+
+## 체크리스트
+- [x] `CalendarEvent.java` — PK 컬럼명 event_id→calendar_event_id, eventType/location/description 필드 추가, update() 시그니처 확장
+- [x] `CalendarEventRequest.java` — eventType/location/notes 필드 추가
+- [x] `CalendarEventDetailResponse.java` — event_type/location/notes + email_sender_name/email_subject(flat) 추가
+- [x] `CalendarEventResponse.java` — event_type/location 추가
+- [x] `CalendarService.java` — createEvent/updateEvent에 새 필드 반영
+- [x] mvn compile 성공 (오류 없음)
+
+## 최종 결과
+- 완료: 2026-04-06
+- 빌드: BUILD SUCCESS

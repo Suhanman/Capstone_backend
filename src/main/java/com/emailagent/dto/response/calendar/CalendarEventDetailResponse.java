@@ -23,6 +23,13 @@ public class CalendarEventDetailResponse extends BaseResponse {
     @JsonProperty("end_datetime")
     private LocalDateTime endDatetime;
 
+    @JsonProperty("event_type")
+    private String eventType;
+
+    private String location;
+
+    private String notes; // DB description 컬럼 → notes 노출
+
     private String source;
     private String status;
 
@@ -30,7 +37,14 @@ public class CalendarEventDetailResponse extends BaseResponse {
     private boolean isCalendarAdded;
 
     @JsonProperty("email_id")
-    private Long emailId;       // 이메일에서 감지된 경우 연결된 이메일 ID (nullable)
+    private Long emailId;
+
+    // 원본 이메일 연결 정보 (이메일에서 감지된 일정인 경우에만 값 존재)
+    @JsonProperty("email_sender_name")
+    private String emailSenderName;
+
+    @JsonProperty("email_subject")
+    private String emailSubject;
 
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
@@ -44,10 +58,15 @@ public class CalendarEventDetailResponse extends BaseResponse {
                 .title(event.getTitle())
                 .startDatetime(event.getStartDatetime())
                 .endDatetime(event.getEndDatetime())
+                .eventType(event.getEventType())
+                .location(event.getLocation())
+                .notes(event.getDescription())
                 .source(event.getSource())
                 .status(event.getStatus())
                 .isCalendarAdded(event.isCalendarAdded())
                 .emailId(event.getEmail() != null ? event.getEmail().getEmailId() : null)
+                .emailSenderName(event.getEmail() != null ? event.getEmail().getSenderName() : null)
+                .emailSubject(event.getEmail() != null ? event.getEmail().getSubject() : null)
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())
                 .build();

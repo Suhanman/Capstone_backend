@@ -193,6 +193,102 @@
 |--------|--------|
 | `data` (array) | `events` (array) |
 
+#### 신규 필드 — `events` 배열 아이템에 추가 (2026-04-06)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `event_type` | string | 일정 유형 (`meeting` / `video` / `call` / `deadline`), nullable |
+| `location` | string | 장소 또는 회의 링크, nullable |
+
+**변경 후 응답 예시**
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": "",
+  "events": [
+    {
+      "event_id": 12,
+      "title": "그린에너지 파트너십 미팅",
+      "start_datetime": "2026-04-10T10:00:00",
+      "end_datetime": "2026-04-10T11:30:00",
+      "event_type": "meeting",
+      "location": "본사 3층 회의실 A",
+      "source": "EMAIL",
+      "status": "PENDING",
+      "is_calendar_added": false,
+      "created_at": "2026-04-04T12:00:00"
+    }
+  ]
+}
+```
+
+---
+
+### 11-1. GET /api/calendar/events/{event_id} — 응답 확장 (2026-04-06)
+
+#### 신규 필드 추가
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `event_type` | string | 일정 유형 (`meeting` / `video` / `call` / `deadline`), nullable |
+| `location` | string | 장소 또는 회의 링크, nullable |
+| `notes` | string | 메모 / 상세 내용, nullable |
+| `email_sender_name` | string | 원본 이메일 발신자명 (이메일 감지 일정만 존재), nullable |
+| `email_subject` | string | 원본 이메일 제목 (이메일 감지 일정만 존재), nullable |
+
+**변경 후 응답 예시**
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": "",
+  "event_id": 12,
+  "title": "그린에너지 파트너십 미팅",
+  "start_datetime": "2026-04-10T10:00:00",
+  "end_datetime": "2026-04-10T11:30:00",
+  "event_type": "meeting",
+  "location": "본사 3층 회의실 A",
+  "notes": "전략적 파트너십 논의",
+  "source": "EMAIL",
+  "status": "PENDING",
+  "is_calendar_added": false,
+  "email_id": 301,
+  "email_sender_name": "최영호",
+  "email_subject": "3월 파트너십 미팅 요청",
+  "created_at": "2026-04-04T12:00:00",
+  "updated_at": "2026-04-04T12:30:00"
+}
+```
+
+---
+
+### 11-2. POST /api/calendar/events · PUT /api/calendar/events/{event_id} — 요청 확장 (2026-04-06)
+
+#### 신규 요청 필드 추가
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `eventType` | string | 선택 | 일정 유형 (`meeting` / `video` / `call` / `deadline`) |
+| `location` | string | 선택 | 장소 또는 회의 링크 |
+| `notes` | string | 선택 | 메모 / 상세 내용 |
+
+**요청 예시**
+```json
+{
+  "title": "그린에너지 파트너십 미팅",
+  "startDatetime": "2026-04-10T10:00:00",
+  "endDatetime": "2026-04-10T11:30:00",
+  "eventType": "meeting",
+  "location": "본사 3층 회의실 A",
+  "notes": "전략적 파트너십 논의"
+}
+```
+
+> 요청 필드는 camelCase, 응답 필드는 snake_case 입니다.
+
 ---
 
 ### 11. GET /api/business/resources/files
@@ -235,6 +331,53 @@
 
 ---
 
+## 신규 API — 비밀번호 찾기 (2026-04-06)
+
+### POST /api/auth/password-reset
+
+비로그인 상태에서 이름 + 이메일로 본인 확인 후 새 비밀번호로 변경합니다.
+
+**인증**: 불필요 (JWT 없이 호출 가능)
+
+**요청**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `name` | string | ✅ | 가입 시 등록한 이름 |
+| `email` | string | ✅ | 가입 시 등록한 이메일 |
+| `new_password` | string | ✅ | 새 비밀번호 (8자 이상) |
+
+```json
+{
+  "name": "홍길동",
+  "email": "hong@example.com",
+  "new_password": "newpassword123"
+}
+```
+
+**성공 응답 (200)**
+
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": ""
+}
+```
+
+**실패 응답**
+
+| 상황 | result_code | result_req |
+|------|-------------|------------|
+| 이름/이메일 불일치 | 400 | 이름 또는 이메일이 올바르지 않습니다. |
+| 비활성화된 계정 | 400 | 비활성화된 계정입니다. |
+| 유효성 검사 실패 | 400 | (필드별 오류 메시지) |
+
+> 이름과 이메일이 모두 일치해야 변경됩니다. 보안상 어느 쪽이 틀렸는지 구분하지 않습니다.
+
+---
+
 ## 신규 API — 첨부파일 다운로드
 
 ### GET /api/inbox/{email_id}/attachments/{attachment_id}
@@ -257,7 +400,7 @@
 - `content_type`이 `application/pdf` 또는 `image/*` → 팝업/새 창 미리보기
 - 그 외 → 로컬 다운로드
 
-**호출 흐름**
+**호출 흐름**/resume
 ```
 1. GET /api/inbox/501          → email_info.attachments[0].attachment_id = 1 확인
 2. 사용자가 파일명 클릭

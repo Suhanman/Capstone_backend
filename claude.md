@@ -46,7 +46,7 @@
 
 3. 공통 응답 형식 (매우 중요 🚨):
    - 모든 API 응답(성공 및 예외 에러 모두)은 반드시 `BaseResponse`를 상속받아 구현한다.
-   - 모든 응답의 최상위 JSON 구조는 다음 4가지 공통 필드를 필수로 포함해야 한다.
+   - 모든 응답의 최상위 JSON 구조는 다음 4가지 공통 필드를 필수로 포함해야 한다.(첨부파일 다운로드 api는 예외)
       1) `content_type`: "application/json" (고정)
       2) `success`: boolean (성공 시 true, 에러 시 false)
       3) `result_code`: int (HTTP 상태 코드 사용. 예: 200, 400, 403)
@@ -80,8 +80,8 @@
     - N+1 방지: 연관 엔티티는 FETCH JOIN 사용
     - 본인 소유 데이터인지 userId 검증 필수
 
-## Google OAuth / Gmail 연동 담당
-- 담당 API: /api/integrations/**, /api/auth/**
+## Google OAuth / Gmail 연동 / 관리자 담당
+- 담당 API: /api/integrations/**, /api/auth/**, /api/admin/**
 - 위 핵심 아키텍처 및 인증 룰 참고
 
 ## 메시지 파이프라인 연동 담당

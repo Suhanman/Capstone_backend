@@ -23,6 +23,11 @@ public class CalendarEventResponse {
     @JsonProperty("end_datetime")
     private LocalDateTime endDatetime;
 
+    @JsonProperty("event_type")
+    private String eventType;
+
+    private String location;
+
     private String source;
     private String status;
 
@@ -38,6 +43,8 @@ public class CalendarEventResponse {
                 .title(event.getTitle())
                 .startDatetime(event.getStartDatetime())
                 .endDatetime(event.getEndDatetime())
+                .eventType(event.getEventType())
+                .location(event.getLocation())
                 .source(event.getSource())
                 .status(event.getStatus())
                 .isCalendarAdded(event.isCalendarAdded())

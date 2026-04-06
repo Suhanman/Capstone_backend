@@ -81,7 +81,7 @@ public class GmailApiService {
      *
      * @param userId           발송 주체 사용자 ID
      * @param gmailMessageId   Gmail 메시지 ID (Email.externalMsgId)
-     * @param gmailAttachmentId Gmail 첨부파일 ID (EmailAttachment.externalAttachmentId)
+     * @param gmailAttachmentId Gmail 첨부파일 ID (AttachmentMetaDto.gmailAttachmentId)
      * @return 첨부파일 원본 바이트 배열 (Base64URL 디코딩 완료)
      * @throws GmailApiCallException Gmail API 호출 실패 시
      */

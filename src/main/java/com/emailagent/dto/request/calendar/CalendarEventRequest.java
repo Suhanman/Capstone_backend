@@ -15,7 +15,13 @@ public class CalendarEventRequest {
     private String title;
 
     @NotNull(message = "시작 일시는 필수입니다.")
-    private LocalDateTime startDatetime;
+    private LocalDateTime startDatetime; // 프론트 요청: camelCase "startDatetime"
 
     private LocalDateTime endDatetime;
+
+    private String eventType; // 프론트 요청: camelCase "eventType" (meeting/video/call/deadline)
+
+    private String location;
+
+    private String notes; // DB의 description 컬럼에 저장
 }

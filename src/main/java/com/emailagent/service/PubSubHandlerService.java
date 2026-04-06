@@ -162,7 +162,7 @@ public class PubSubHandlerService {
         // 5단계: HTML 태그 제거(Jsoup), 서명·인용문·footer 제거, 공백 정규화
         String bodyClean = EmailParsingUtil.cleanBody(bodyRaw, isHtml);
 
-        // 첨부파일 파트 수집 (6단계 JSON 구성 및 EmailAttachment 저장에 사용)
+        // 첨부파일 파트 수집 (attachments_meta JSON 구성에 사용)
         List<MessagePart> attachmentParts = EmailParsingUtil.collectAttachmentParts(payload);
 
         // ① attachments_meta JSON 구성 — 1-based 시퀀스 attachment_id 부여

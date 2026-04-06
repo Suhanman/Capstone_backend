@@ -34,6 +34,7 @@ public class SecurityConfig {
                 // 공개 엔드포인트 (인증 불필요)
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()           // 회원가입
                 .requestMatchers(HttpMethod.POST, "/api/auth/tokens").permitAll()     // 로그인
+                .requestMatchers(HttpMethod.POST, "/api/auth/password-reset").permitAll() // 비밀번호 찾기
                 .requestMatchers(HttpMethod.GET, "/api/users/email-availability").permitAll() // 이메일 중복 확인
                 .requestMatchers(HttpMethod.GET, "/api/integrations/google/callback").permitAll() // OAuth 콜백
                 .requestMatchers("/api/webhook/**").permitAll()

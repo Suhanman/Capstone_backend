@@ -2,6 +2,7 @@ package com.emailagent.service;
 
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.request.auth.PasswordChangeRequest;
+import com.emailagent.dto.request.auth.PasswordResetRequest;
 import com.emailagent.dto.request.auth.UserProfileUpdateRequest;
 import com.emailagent.dto.response.auth.BaseResponse;
 import com.emailagent.dto.response.auth.EmailAvailabilityResponse;
@@ -53,6 +54,29 @@ public class UserService {
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new BadCredentialsException("현재 비밀번호가 올바르지 않습니다.");
         }
+        user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
+        return new BaseResponse();
+    }
+
+    /**
+     * POST /api/auth/password-reset — 비로그인 상태에서 비밀번호 찾기
+     * 이름 + 이메일로 본인 확인 후 새 비밀번호로 변경
+     */
+    @Transactional
+    public BaseResponse resetPassword(PasswordResetRequest request) {
+        // 이메일로 사용자 조회 — 없을 경우 보안상 동일한 메시지 반환
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("이름 또는 이메일이 올바르지 않습니다."));
+
+        if (!user.isActive()) {
+            throw new IllegalStateException("비활성화된 계정입니다.");
+        }
+
+        // 이름 일치 여부 검증
+        if (!user.getName().equals(request.getName())) {
+            throw new IllegalArgumentException("이름 또는 이메일이 올바르지 않습니다.");
+        }
+
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
         return new BaseResponse();
     }
