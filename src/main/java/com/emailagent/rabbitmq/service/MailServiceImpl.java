@@ -7,6 +7,7 @@ import com.emailagent.domain.enums.OutboxStatus;
 import com.emailagent.dto.response.admin.operation.AdminJobDetailResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
+import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
 import com.emailagent.rabbitmq.event.SseNotifyEvent;
 import com.emailagent.repository.EmailAnalysisResultRepository;
@@ -82,10 +83,19 @@ public class MailServiceImpl implements MailService {
     @Override
     @Transactional
     public void markPublishedFailed(Long outboxId) {
-        // Publisher Confirm ack=false → SENDING → READY 롤백 (브로커 미전달)
+        // Publisher Confirm ack=false → retryCount 증가 후 한도 초과 여부 판단
+        // retry 판단 로직은 Service 계층이 담당 (Outbox 엔티티는 상태 전이만 수행)
         outboxRepository.findById(outboxId).ifPresent(outbox -> {
-            log.warn("[MailService] Publisher Confirm 실패 — outboxId={}, READY로 롤백", outboxId);
-            outbox.markAsFailed("Publisher Confirm ack=false");
+            outbox.incrementRetryCount();
+            if (outbox.getRetryCount() >= OutboxPolicy.MAX_RETRY) {
+                log.error("[MailService] 발행 최대 재시도 초과 → FAILED — outboxId={}, retryCount={}",
+                        outboxId, outbox.getRetryCount());
+                outbox.markAsFailed("Publisher Confirm ack=false, max retry exceeded");
+            } else {
+                log.warn("[MailService] Publisher Confirm 실패 → READY 롤백 — outboxId={}, retryCount={}",
+                        outboxId, outbox.getRetryCount());
+                outbox.markAsReady();
+            }
         });
     }
 
@@ -146,12 +156,13 @@ public class MailServiceImpl implements MailService {
     @Override
     @Transactional
     public void resetTimedOut() {
-        // SENDING 상태가 30분 초과한 Outbox를 READY로 롤백
+        // SENDING 상태가 30분 초과한 Outbox를 READY로 단순 롤백
+        // retryCount를 소모하지 않음: 타임아웃은 발행 실패가 아닌 네트워크 지연 등 외부 요인이므로
         LocalDateTime timeout = LocalDateTime.now().minusMinutes(TIMEOUT_MINUTES);
         List<Outbox> timedOut = outboxRepository.findTimedOutMessages(timeout);
         timedOut.forEach(outbox -> {
             log.warn("[MailService] SENDING 타임아웃 → READY 롤백 — outboxId={}", outbox.getOutboxId());
-            outbox.markAsFailed("SENDING timeout " + TIMEOUT_MINUTES + "min");
+            outbox.markAsReady();
         });
     }
 
@@ -199,7 +210,7 @@ public class MailServiceImpl implements MailService {
                 outbox.getStatus().name(),
                 outbox.getPayload() != null ? outbox.getPayload().toString() : "",
                 outbox.getRetryCount(),
-                outbox.getMaxRetry(),
+                OutboxPolicy.MAX_RETRY,
                 outbox.getCreatedAt().toString(),
                 outbox.getSentAt() != null ? outbox.getSentAt().toString() : null,
                 outbox.getFinishedAt() != null ? outbox.getFinishedAt().toString() : null

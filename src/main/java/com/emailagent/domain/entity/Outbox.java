@@ -47,10 +47,6 @@ public class Outbox {
     @Builder.Default
     private int retryCount = 0;
 
-    @Column(name = "max_retry", nullable = false)
-    @Builder.Default
-    private int maxRetry = 5;
-
     @Column(name = "fail_reason", length = 500)
     private String failReason;
 
@@ -75,13 +71,19 @@ public class Outbox {
         this.finishedAt = LocalDateTime.now();
     }
 
-    public void markAsFailed(String reason) {
+    /** 발행 재시도 카운트 증가 (retry 판단은 Service 계층에서 수행) */
+    public void incrementRetryCount() {
         this.retryCount++;
-        if (this.retryCount >= this.maxRetry) {
-            this.status = OutboxStatus.FAILED;
-            this.failReason = reason;
-        } else {
-            this.status = OutboxStatus.READY; // 재시도 대기
-        }
+    }
+
+    /** 단순 READY 롤백 — 타임아웃 복구 시 retryCount 소모 없이 재투입 */
+    public void markAsReady() {
+        this.status = OutboxStatus.READY;
+    }
+
+    /** FAILED 확정 — 재시도 한도 초과 시 Service에서 판단 후 호출 */
+    public void markAsFailed(String reason) {
+        this.status = OutboxStatus.FAILED;
+        this.failReason = reason;
     }
 }
