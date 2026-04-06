@@ -74,6 +74,12 @@
 | `data.ai_analysis` | `ai_analysis` |
 | `data.draft_reply` | `draft_reply` |
 
+#### 신규 필드 — `ai_analysis` 내부에 추가
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `summary` | string | AI가 생성한 이메일 요약 텍스트 |
+
 #### 신규 필드 — `email_info` 내부에 추가
 
 | 필드 | 타입 | 설명 |
@@ -117,6 +123,12 @@
 
 ### 3. POST /api/inbox/{email_id}/regenerate
 
+#### 요청 바디
+
+```json
+{ "previous_draft": "기존 초안 텍스트" }
+```
+
 #### 응답 구조 변경 — flat화
 
 | 변경 전 접근 경로 | 변경 후 접근 경로 |
@@ -127,11 +139,24 @@
 
 ### 4. GET /api/inbox/{email_id}/recommendations
 
+쿼리 파라미터: `?topK=3`
+
 #### 응답 구조 변경 — 필드명 변경
 
 | 변경 전 | 변경 후 |
 |--------|--------|
 | `data` (array) | `drafts` (array) |
+
+#### `drafts` 배열 아이템 필드
+
+```json
+{
+  "result_code": 200, "result_req": "", "success": true,
+  "drafts": [
+    { "draft_id": 1, "subject": "...", "body": "...", "similarity": 0.95, "email_id": 100 }
+  ]
+}
+```
 
 ---
 
@@ -406,3 +431,83 @@
 2. 사용자가 파일명 클릭
 3. GET /api/inbox/501/attachments/1  → 파일 스트림 수신
 ```
+
+---
+
+## DB 변경사항
+
+- `Users` 테이블에 `onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE` 컬럼 추가
+
+```sql
+ALTER TABLE Users ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE;
+```
+
+---
+
+## 신규 추가된 API
+
+### 온보딩
+
+#### GET /api/onboarding/status
+
+```json
+{ "result_code": 200, "result_req": "", "success": true, "onboarding_completed": false }
+```
+
+#### POST /api/onboarding/complete
+
+```json
+{ "result_code": 200, "result_req": "", "success": true }
+```
+
+#### POST /api/business/templates/generate-initial
+
+**요청**
+```json
+{
+  "industry_type": "SaaS",
+  "email_tone": "NEUTRAL",
+  "company_description": "...",
+  "category_ids": [1, 2, 3],
+  "faq_ids": [1, 2],
+  "resource_ids": [1]
+}
+```
+
+**응답**
+```json
+{ "result_code": 200, "result_req": "", "success": true, "status": "PROCESSING", "processing_count": 3 }
+```
+
+---
+
+### 캘린더
+
+#### DELETE /api/calendar/events/{event_id}
+
+```json
+{ "result_code": 200, "result_req": "", "success": true }
+```
+
+---
+
+## 추가 변경된 API
+
+### POST /api/automations/rules — `keywords` 필드 제거
+
+요청 바디에서 `keywords` 필드가 제거되었습니다.
+
+### PUT /api/automations/rules/{rule_id} — `keywords` 필드 제거
+
+요청 바디에서 `keywords` 필드가 제거되었습니다.
+
+---
+
+## 요청 필드명 규칙
+
+아래 API는 요청 바디에 **camelCase** 필드명을 사용합니다.
+
+| API | camelCase 필드 |
+|-----|---------------|
+| `POST /api/templates` | `categoryId`, `subjectTemplate`, `bodyTemplate` |
+| `POST /api/calendar/events` | `startDatetime`, `endDatetime` |

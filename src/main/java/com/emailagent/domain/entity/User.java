@@ -41,6 +41,10 @@ public class User {
     @Builder.Default
     private boolean isActive = true;
 
+    @Column(name = "onboarding_completed", nullable = false)
+    @Builder.Default
+    private boolean onboardingCompleted = false;
+
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
@@ -76,5 +80,9 @@ public class User {
 
     public void updateActiveStatus(boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public void completeOnboarding() {
+        this.onboardingCompleted = true;
     }
 }
