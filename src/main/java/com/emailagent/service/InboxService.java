@@ -63,9 +63,17 @@ public class InboxService {
                 ? emailRepository.findInboxPageByStatus(userId, EmailStatus.valueOf(status), pageable)
                 : emailRepository.findInboxPage(userId, pageable);
 
-        List<InboxListResponse.EmailItem> content = emailPage.getContent()
+        List<Email> emails = emailPage.getContent();
+
+        // N+1 방지: email ID 목록으로 DraftReply 일괄 조회 후 Map으로 변환
+        List<Long> emailIds = emails.stream().map(Email::getEmailId).toList();
+        Map<Long, DraftReply> draftByEmailId = draftReplyRepository
+                .findByEmailIdsAndUserId(emailIds, userId)
                 .stream()
-                .map(InboxListResponse.EmailItem::from)
+                .collect(Collectors.toMap(d -> d.getEmail().getEmailId(), d -> d));
+
+        List<InboxListResponse.EmailItem> content = emails.stream()
+                .map(email -> InboxListResponse.EmailItem.from(email, draftByEmailId.get(email.getEmailId())))
                 .toList();
 
         return InboxListResponse.builder()
@@ -95,12 +103,35 @@ public class InboxService {
         EmailInfo emailInfo = EmailInfo.builder()
                 .emailId(email.getEmailId())
                 .senderName(email.getSenderName())
+                .senderEmail(email.getSenderEmail())
                 .subject(email.getSubject())
                 .body(email.getBodyClean())
                 .receivedAt(email.getReceivedAt())
                 .hasAttachments(email.isHasAttachments())
                 .attachments(attachments)
                 .build();
+
+        // CalendarEvents에서 이 이메일에 연결된 일정 조회
+        Schedule schedule = calendarEventRepository
+                .findByEmail_EmailIdAndUser_UserId(emailId, userId)
+                .map(event -> Schedule.builder()
+                        .hasSchedule(true)
+                        .title(event.getTitle())
+                        .date(event.getStartDatetime() != null ? event.getStartDatetime().toLocalDate() : null)
+                        .startTime(event.getStartDatetime() != null ? event.getStartDatetime().toLocalTime() : null)
+                        .endTime(event.getEndDatetime() != null ? event.getEndDatetime().toLocalTime() : null)
+                        .location(event.getLocation())
+                        .participants(null)
+                        .build())
+                .orElse(Schedule.builder()
+                        .hasSchedule(false)
+                        .title(null)
+                        .date(null)
+                        .startTime(null)
+                        .endTime(null)
+                        .location(null)
+                        .participants(null)
+                        .build());
 
         AiAnalysis aiAnalysis = (ar != null) ? AiAnalysis.builder()
                 .domain(ar.getDomain())
@@ -109,6 +140,7 @@ public class InboxService {
                 .entities(ar.getEntitiesJson())
                 .confidenceScore(ar.getConfidenceScore())
                 .scheduleDetected(ar.isScheduleDetected())
+                .schedule(schedule)
                 .build() : null;
 
         DraftReplyInfo draftReplyInfo = draftReplyRepository

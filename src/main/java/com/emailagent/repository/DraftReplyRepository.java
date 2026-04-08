@@ -27,6 +27,11 @@ public interface DraftReplyRepository extends JpaRepository<DraftReply, Long> {
     // draft 큐 Consumer에서 emailId만으로 초안 조회 (upsert 처리용)
     Optional<DraftReply> findByEmail_EmailId(Long emailId);
 
+    // 수신함 목록 조회 시 N+1 방지용 batch 조회
+    @Query("SELECT d FROM DraftReply d WHERE d.email.emailId IN :emailIds AND d.user.userId = :userId")
+    List<DraftReply> findByEmailIdsAndUserId(@Param("emailIds") List<Long> emailIds,
+                                             @Param("userId") Long userId);
+
     long countByUser_UserId(Long userId);
 
     // 관리자 대시보드: 오늘 초안 생성 건수

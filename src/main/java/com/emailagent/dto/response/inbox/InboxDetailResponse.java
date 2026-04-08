@@ -6,7 +6,9 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +37,9 @@ public class InboxDetailResponse extends BaseResponse {
         @JsonProperty("sender_name")
         private String senderName;
 
+        @JsonProperty("sender_email")
+        private String senderEmail;
+
         private String subject;
         private String body;
 
@@ -62,6 +67,28 @@ public class InboxDetailResponse extends BaseResponse {
 
         @JsonProperty("schedule_detected")
         private Boolean scheduleDetected;
+
+        private Schedule schedule;
+    }
+
+    // ── 일정 정보 ────────────────────────────────
+    @Getter
+    @Builder
+    public static class Schedule {
+        @JsonProperty("has_schedule")
+        private boolean hasSchedule;
+
+        private String title;
+        private LocalDate date;
+
+        @JsonProperty("start_time")
+        private LocalTime startTime;
+
+        @JsonProperty("end_time")
+        private LocalTime endTime;
+
+        private String location;
+        private List<String> participants;
     }
 
     // ── 초안 답장 ────────────────────────────────

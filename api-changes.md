@@ -503,6 +503,81 @@ ALTER TABLE Users ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE
 
 ---
 
+---
+
+## 수신함 API 응답 필드 보강 (2026-04-08)
+
+### GET /api/inbox
+
+#### 신규 필드 — `content` 배열 아이템에 추가
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `draft_status` | string \| null | DraftReply 없으면 `null`, 있으면 `PENDING_REVIEW` / `EDITED` / `SENT` / `SKIPPED` |
+
+---
+
+### GET /api/inbox/{emailId}
+
+#### 신규 필드 — `email_info` 내부에 추가
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `sender_email` | string | 발신자 이메일 주소 |
+
+#### 신규 필드 — `ai_analysis` 내부에 추가
+
+`schedule` 객체가 항상 포함됩니다. CalendarEvent가 없으면 `has_schedule: false`, 나머지 필드는 `null`입니다.
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `schedule.has_schedule` | boolean | 감지된 일정 존재 여부 |
+| `schedule.title` | string \| null | 일정 제목 |
+| `schedule.date` | string \| null | 일정 날짜 (`YYYY-MM-DD`) |
+| `schedule.start_time` | string \| null | 시작 시간 (`HH:MM`) |
+| `schedule.end_time` | string \| null | 종료 시간 (`HH:MM`) |
+| `schedule.location` | string \| null | 장소 |
+| `schedule.participants` | array \| null | 참석자 목록 |
+
+**응답 예시 — 일정 있음**
+```json
+{
+  "ai_analysis": {
+    "domain": "...",
+    "intent": "...",
+    "summary": "...",
+    "schedule": {
+      "has_schedule": true,
+      "title": "미팅 제목",
+      "date": "2026-04-10",
+      "start_time": "14:00",
+      "end_time": "15:00",
+      "location": "본사 3층",
+      "participants": null
+    }
+  }
+}
+```
+
+**응답 예시 — 일정 없음**
+```json
+{
+  "ai_analysis": {
+    "schedule": {
+      "has_schedule": false,
+      "title": null,
+      "date": null,
+      "start_time": null,
+      "end_time": null,
+      "location": null,
+      "participants": null
+    }
+  }
+}
+```
+
+---
+
 ## 요청 필드명 규칙
 
 아래 API는 요청 바디에 **camelCase** 필드명을 사용합니다.

@@ -1,5 +1,6 @@
 package com.emailagent.dto.response.inbox;
 
+import com.emailagent.domain.entity.DraftReply;
 import com.emailagent.domain.entity.Email;
 import com.emailagent.domain.entity.EmailAnalysisResult;
 import com.emailagent.dto.response.auth.BaseResponse;
@@ -35,6 +36,9 @@ public class InboxListResponse extends BaseResponse {
 
         private String status;
 
+        @JsonProperty("draft_status")
+        private String draftStatus;
+
         @JsonProperty("category_name")
         private String categoryName;
 
@@ -44,7 +48,7 @@ public class InboxListResponse extends BaseResponse {
         @JsonProperty("has_attachments")
         private boolean hasAttachments;
 
-        public static EmailItem from(Email email) {
+        public static EmailItem from(Email email, DraftReply draftReply) {
             EmailAnalysisResult ar = email.getAnalysisResult();
             return EmailItem.builder()
                     .emailId(email.getEmailId())
@@ -52,6 +56,7 @@ public class InboxListResponse extends BaseResponse {
                     .subject(email.getSubject())
                     .receivedAt(email.getReceivedAt())
                     .status(email.getStatus().name())
+                    .draftStatus(draftReply != null ? draftReply.getStatus().name() : null)
                     .categoryName(ar != null && ar.getCategory() != null
                             ? ar.getCategory().getCategoryName() : null)
                     .scheduleDetected(ar != null && ar.isScheduleDetected())
