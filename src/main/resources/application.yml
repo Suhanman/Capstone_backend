@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:mariadb://192.168.3.10:3306/email_agent?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USERNAME:capstone}
-    password: ${DB_PASSWORD:capstone}
+    url: jdbc:mariadb://${DB_HOST}:${DB_PORT}/email_agent?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
@@ -14,10 +14,10 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MariaDBDialect
   rabbitmq:
-    host: ${RABBITMQ_HOST:192.168.2.20}
-    port: 30672
-    username: ${RABBITMQ_USER:admin}
-    password: ${RABBITMQ_PASS:admin1234!}
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
     virtual-host: /
 
 jwt:
@@ -45,16 +45,16 @@ app:
       draft-result: 2app.draft
 
   ai:
-    server-url: ${AI_SERVER_URL:http://localhost:8000}
+    server-url: ${AI_SERVER_URL}
     api-key: ${AI_API_KEY:}
 
   sse:
-    pods: ${SSE_POD_0_URL:http://localhost:8080},${SSE_POD_1_URL:http://localhost:8081}
+    pods: ${SSE_POD_0_URL},${SSE_POD_1_URL}
 
   google:
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
-    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/integrations/google/callback}
+    redirect-uri: ${GOOGLE_REDIRECT_URI}
     calendar-id: primary
     topic-name: ${GOOGLE_TOPIC_NAME}
 
