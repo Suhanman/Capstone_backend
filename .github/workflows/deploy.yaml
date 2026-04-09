@@ -35,4 +35,4 @@ jobs:
             ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:latest
             ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
