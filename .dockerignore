@@ -1,0 +1,43 @@
+# ============================================================
+# .dockerignore - 빌드 컨텍스트에서 제외할 파일 목록
+# 포함: src/, pom.xml, mvnw (Maven Wrapper)
+# ============================================================
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE / 에디터
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Maven 빌드 산출물 (Stage 1에서 새로 빌드하므로 불필요)
+target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 문서 / 태스크
+*.md
+tasks/
+docs/
+
+# 환경설정 (민감 정보 포함 가능)
+.env
+.env.*
+*.local
+
+# 윈도우 Maven Wrapper (alpine에서 불필요)
+mvnw.cmd
+
+# 로그
+*.log
+logs/
+
+# 업로드 파일 (컨테이너 내부에서 별도 볼륨 사용)
+uploads/
