@@ -35,6 +35,7 @@ public class IntegrationController {
      * (수정됨) Google OAuth 콜백 처리 후 프론트엔드로 리다이렉트
      * Gmail scope 누락 시 403, Calendar scope 누락 시 is_calendar_connected=false로 정상 응답
      */
+    @GetMapping("/google/callback")
     public ResponseEntity<Void> handleCallback(
             @RequestParam String code,
             @RequestParam String state) throws IOException {
@@ -43,9 +44,8 @@ public class IntegrationController {
         CallbackResponse response = googleOAuthService.handleCallback(code, state);
 
         // 2. 리다이렉트할 프론트엔드 주소 생성 (파라미터로 성공 여부 전달)
-        // 주의: 실제 프론트엔드가 실행 중인 주소(예: 3000, 5173 등)에 맞게 포트를 수정해 주세요.
         String frontendUrl = String.format(
-                "http://localhost:3000/settings?gmail=%s&calendar=%s",
+                "http://localhost:5173/settings?gmail=%s&calendar=%s",
                 response.isGmailConnected(),
                 response.isCalendarConnected()
         );
