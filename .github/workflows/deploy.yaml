@@ -47,7 +47,7 @@ jobs:
       - name: Update image tag in deployment
         run: |
           sed -i "s|image: ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:.*|image: ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|" \
-            cluster-repo/backend-manifest/backend-deployment.yaml
+            cluster-repo/backend-manifest/05-backend-deployment.yaml
 
       - name: Commit and push updated manifest
         run: |
