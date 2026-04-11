@@ -54,7 +54,7 @@ jobs:
           cd cluster-repo
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add backend-manifest/backend-deployment.yaml
+          git add backend-manifest/05-backend-deployment.yaml
           git commit -m "ci: update backend image tag to ${{ github.sha }}"
           git push
 
