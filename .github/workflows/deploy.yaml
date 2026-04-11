@@ -36,3 +36,26 @@ jobs:
             ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
+
+      - name: Checkout Cluster repo
+        uses: actions/checkout@v4
+        with:
+          repository: GachonCapstone4/Capstone_Cluster
+          token: ${{ secrets.CAPSTONE_CD_SECRET}}  # 별도 PAT 필요
+          path: cluster-repo
+
+      - name: Update image tag in deployment
+        run: |
+          sed -i "s|image: ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:.*|image: ${{ vars.CAPSTONE_CI_VAR }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|" \
+            cluster-repo/backend-manifest/backend-deployment.yaml
+
+      - name: Commit and push updated manifest
+        run: |
+          cd cluster-repo
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add backend-manifest/backend-deployment.yaml
+          git commit -m "ci: update backend image tag to ${{ github.sha }}"
+          git push
+
+
