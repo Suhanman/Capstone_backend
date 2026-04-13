@@ -62,6 +62,10 @@ public class Integration {
     @Builder.Default
     private SyncStatus syncStatus = SyncStatus.CONNECTED;
 
+    /** Gmail history 동기화 기준점. Pub/Sub 처리 완료 시마다 갱신된다. */
+    @Column(name = "last_history_id")
+    private Long lastHistoryId;
+
     @Column(name = "last_synced_at")
     private LocalDateTime lastSyncedAt;
 
@@ -108,5 +112,13 @@ public class Integration {
      */
     public void disconnectCalendar() {
         this.isCalendarConnected = false;
+    }
+
+    /**
+     * Gmail history 동기화 기준점 갱신.
+     * Pub/Sub 처리 완료 시마다 호출하여 다음 조회의 startHistoryId로 사용한다.
+     */
+    public void updateLastHistoryId(Long historyId) {
+        this.lastHistoryId = historyId;
     }
 }

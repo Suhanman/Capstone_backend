@@ -74,15 +74,29 @@ public class PubSubHandlerService {
             // 2. Gmail 클라이언트 생성 (토큰 만료 시 RefreshToken으로 자동 갱신)
             Gmail gmailClient = googleApiClientProvider.buildGmailClient(integration);
 
-            // 3. historyId 이후 변경 이력 조회 — 신규 수신 메시지(messageAdded)만 필터링
+            // 3. startHistoryId 결정:
+            //    - lastHistoryId가 저장된 경우: 직전 처리 기준점 사용 (정상 경로)
+            //    - 최초 수신 또는 기준점 없는 경우: Pub/Sub historyId - 1 사용 (fallback)
+            //    Gmail API는 startHistoryId보다 큰 이력만 반환하므로,
+            //    Pub/Sub에서 받은 historyId 자체가 아닌 이전 기준점을 넘겨야 한다.
+            long startHistoryId;
+            if (integration.getLastHistoryId() != null) {
+                startHistoryId = integration.getLastHistoryId();
+            } else {
+                startHistoryId = historyId - 1;
+            }
+
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
-                    .setStartHistoryId(BigInteger.valueOf(historyId))
+                    .setStartHistoryId(BigInteger.valueOf(startHistoryId))
                     .setHistoryTypes(List.of("messageAdded"))
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
-                log.debug("[PubSub] 신규 메시지 없음 — historyId={}, emailAddress={}", historyId, emailAddress);
+                log.debug("[PubSub] 신규 메시지 없음 — startHistoryId={}, pubsubHistoryId={}, emailAddress={}",
+                        startHistoryId, historyId, emailAddress);
+                // 메시지 없어도 기준점은 갱신 (다음 알림을 위해)
+                integration.updateLastHistoryId(historyId);
                 return;
             }
 
@@ -103,8 +117,11 @@ public class PubSubHandlerService {
                 if (saved) savedCount++;
             }
 
-            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건",
-                    emailAddress, savedCount, messageIds.size());
+            // 처리 완료 후 lastHistoryId 갱신 — 다음 Pub/Sub 알림의 startHistoryId 기준점
+            integration.updateLastHistoryId(historyId);
+
+            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건, lastHistoryId={}",
+                    emailAddress, savedCount, messageIds.size(), historyId);
 
         } catch (Exception e) {
             // @Async 스레드 내 예외는 전역 핸들러가 잡지 못하므로 여기서 반드시 기록
