@@ -1,7 +1,11 @@
 package com.emailagent.controller;
 
 import com.emailagent.dto.request.auth.IntegrationStatusUpdateRequest;
-import com.emailagent.dto.response.auth.*;
+import com.emailagent.dto.response.auth.AuthorizationUrlResponse;
+import com.emailagent.dto.response.auth.BaseResponse;
+import com.emailagent.dto.response.auth.CallbackResponse;
+import com.emailagent.dto.response.auth.IntegrationResponse;
+import com.emailagent.dto.response.auth.IntegrationStatusResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.GoogleOAuthService;
 import jakarta.validation.Valid;
@@ -22,8 +26,11 @@ public class IntegrationController {
 
     private final GoogleOAuthService googleOAuthService;
 
-    @Value("${app.google.frontend.base-url:http://localhost:5173}")
+    @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
+
+    @Value("${app.frontend.email-integration-path:/app/settings?tab=email}")
+    private String emailIntegrationPath;
 
     @GetMapping("/google/authorization-url")
     public ResponseEntity<AuthorizationUrlResponse> getAuthorizationUrl(@CurrentUser Long userId) {
@@ -38,7 +45,7 @@ public class IntegrationController {
             CallbackResponse response = googleOAuthService.handleCallback(code, state);
 
             String redirectUrl = frontendBaseUrl
-                    + "/app/settings?tab=email"
+                    + emailIntegrationPath
                     + "&google_oauth=success"
                     + "&gmail_connected=" + response.isGmailConnected()
                     + "&calendar_connected=" + response.isCalendarConnected();
@@ -53,7 +60,7 @@ public class IntegrationController {
             );
 
             String redirectUrl = frontendBaseUrl
-                    + "/app/settings?tab=email"
+                    + emailIntegrationPath
                     + "&google_oauth=error"
                     + "&message=" + message;
 

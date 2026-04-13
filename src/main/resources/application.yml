@@ -59,6 +59,7 @@ app:
     topic-name: ${GOOGLE_TOPIC_NAME}
     frontend:
       base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+    email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email
 
   webhook:
     pubsub-verify-token: ${PUBSUB_VERIFY_TOKEN}
