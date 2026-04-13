@@ -17,6 +17,7 @@ Pub/Sub이 보낸 현재 이벤트의 `historyId`를 그대로 넣으면 항상 
 
 1. `src/main/java/com/emailagent/domain/entity/Integration.java`
 2. `src/main/java/com/emailagent/service/PubSubHandlerService.java`
+3. `src/main/java/com/emailagent/service/GoogleOAuthService.java`
 
 ---
 
@@ -305,6 +306,41 @@ public void handleAsync(String emailAddress, Long historyId) {
     }
 }
 ```
+
+---
+
+## 3. GoogleOAuthService.java 수정
+
+### 수정 위치: `watch()` 호출 직후 (`GoogleOAuthService.java:180`)
+
+#### 수정 전 (버그)
+
+```java
+WatchResponse watchResponse = gmailClient.users().watch("me", watchRequest).execute();
+log.info("[OAuth] Gmail watch() 등록 완료 — userId={}, historyId={}, expiration={}",
+        userId, watchResponse.getHistoryId(), watchResponse.getExpiration());
+```
+
+#### 수정 후
+
+```java
+WatchResponse watchResponse = gmailClient.users().watch("me", watchRequest).execute();
+// watch() 응답의 historyId를 초기 동기화 기준점으로 저장.
+// 이 값이 없으면 첫 Pub/Sub 알림 도착 시 startHistoryId를 결정할 수 없어
+// history().list()가 빈 결과를 반환하는 버그가 발생한다.
+savedIntegration.updateLastHistoryId(watchResponse.getHistoryId().longValue());
+log.info("[OAuth] Gmail watch() 등록 완료 — userId={}, historyId={}, expiration={}",
+        userId, watchResponse.getHistoryId(), watchResponse.getExpiration());
+```
+
+### 이유
+
+Pub/Sub 알림의 `historyId`는 변경이 발생한 레코드 ID가 아니라 **알림 시점의 최신 historyId**다.
+실제 messageAdded 이벤트는 훨씬 이전 historyId에 존재할 수 있으므로,
+`historyId - 1` fallback으로는 메시지를 절대 찾을 수 없다.
+
+`watch()` 응답의 historyId를 초기 기준점으로 저장해야
+첫 Pub/Sub 알림부터 올바른 범위(`lastHistoryId` ~ 현재)를 조회할 수 있다.
 
 ---
 
