@@ -82,7 +82,7 @@ public class PubSubHandlerService {
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
-                log.info("[PubSub] 신규 메시지 없음 — historyId={}, emailAddress={}", historyId, emailAddress);
+                log.debug("[PubSub] 신규 메시지 없음 — historyId={}, emailAddress={}", historyId, emailAddress);
                 return;
             }
 
@@ -103,7 +103,7 @@ public class PubSubHandlerService {
                 if (saved) savedCount++;
             }
 
-            log.info("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건",
+            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건",
                     emailAddress, savedCount, messageIds.size());
 
         } catch (Exception e) {
@@ -229,7 +229,7 @@ public class PubSubHandlerService {
                 .build();
         outboxRepository.save(outbox);
 
-        log.info("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
+        log.debug("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
                 messageId, subject, senderEmail, attachmentParts.size());
         return true;
     }

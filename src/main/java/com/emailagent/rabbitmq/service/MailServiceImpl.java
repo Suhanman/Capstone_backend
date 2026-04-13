@@ -68,7 +68,6 @@ public class MailServiceImpl implements MailService {
 
         int updatedCount = outboxRepository.updateReadyToSending(limit);
         if (updatedCount == 0) {
-            log.debug("[MailService] markAsSendingBatch: 처리할 READY 항목 없음");
             return List.of();
         }
 

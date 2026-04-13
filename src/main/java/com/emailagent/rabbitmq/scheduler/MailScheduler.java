@@ -40,7 +40,6 @@ public class MailScheduler {
         List<Outbox> sendingList = mailService.markAsSendingBatch(POLL_BATCH_SIZE);
 
         if (sendingList.isEmpty()) {
-            log.debug("[MailScheduler] 처리할 데이터가 없습니다.");
             return;
         }
 
