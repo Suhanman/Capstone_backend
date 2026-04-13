@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/integrations/google/callback").permitAll() // OAuth 콜백
                 .requestMatchers("/api/webhook/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+                // 구글 도메인 소유권 인증 HTML 파일 접근 허용 추가
+                .requestMatchers("/api/google1241a7c6be48577e.html").permitAll()
                 // 관리자 전용
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 나머지 인증 필요
