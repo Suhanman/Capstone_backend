@@ -36,6 +36,7 @@ public class GoogleOAuthService {
 
     // Google OAuth 요청 시 포함할 전체 스코프 (Gmail 필수 + Calendar 선택)
     private static final List<String> REQUEST_SCOPES = Arrays.asList(
+            "openid",
             "email",
             "profile",
             "https://www.googleapis.com/auth/gmail.readonly",
