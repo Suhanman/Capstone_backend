@@ -89,6 +89,12 @@
 - 1번 : 서비스 CRUD 및 Google OAuth, Gmail 연동 등의 비즈니스 로직에 일체 간섭하지 않는다.
 - 2번 : 부득이하게 2번을 어겨야 할경우 반드시 검토받는다.
 
+## AI 학습 Job 시스템 연동 기준
+- 참고 문서: AI_학습_Job_시스템_연동_기준.md
+- AI 학습 Job 관련 작업 시 반드시 이 문서를 먼저 읽고 구현할 것
+- training_jobs 테이블 기반 Job 상태 관리
+- q.2ai.training / q.2app.training 큐 사용
+
 
 # 워크플로우 원칙 
 
