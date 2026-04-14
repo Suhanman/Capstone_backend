@@ -70,5 +70,4 @@ server:
 logging:
   level:
     com.emailagent: DEBUG
-#    com.emailagent.rabbitmq: DEBUG
     org.springframework.security: INFO

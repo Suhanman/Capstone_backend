@@ -178,6 +178,10 @@ public class GoogleOAuthService {
                     .setTopicName(topicName)
                     .setLabelIds(List.of("INBOX"));
             WatchResponse watchResponse = gmailClient.users().watch("me", watchRequest).execute();
+            // watch() 응답의 historyId를 초기 동기화 기준점으로 저장.
+            // 이 값이 없으면 첫 Pub/Sub 알림 도착 시 startHistoryId를 결정할 수 없어
+            // history().list()가 빈 결과를 반환하는 버그가 발생한다.
+            savedIntegration.updateLastHistoryId(watchResponse.getHistoryId().longValue());
             log.info("[OAuth] Gmail watch() 등록 완료 — userId={}, historyId={}, expiration={}",
                     userId, watchResponse.getHistoryId(), watchResponse.getExpiration());
         } catch (Exception e) {
