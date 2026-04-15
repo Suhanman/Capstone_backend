@@ -87,18 +87,17 @@ public class EmailAnalysisResult {
     }
 
     /**
-     * classify 큐 AI 결과 수신 후 업데이트
-     * emailEmbedding: float[] (MariaDB VECTOR(384) 바이너리로 저장)
+     * classify 큐 AI 결과 수신 후 업데이트.
+     * emailEmbedding은 RAG 서버가 직접 저장하므로 백엔드에서 처리하지 않는다.
      */
     public void updateFromClassify(String domain, String intent, BigDecimal confidenceScore,
-                                   String summaryText, boolean scheduleDetected, float[] emailEmbedding,
+                                   String summaryText, boolean scheduleDetected,
                                    Map<String, Object> entitiesJson, String modelVersion) {
         this.domain = domain;
         this.intent = intent;
         this.confidenceScore = confidenceScore;
         this.summaryText = summaryText;
         this.scheduleDetected = scheduleDetected;
-        this.emailEmbedding = emailEmbedding;
         this.entitiesJson = entitiesJson;
         this.modelVersion = modelVersion;
     }

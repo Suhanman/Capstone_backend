@@ -125,9 +125,6 @@ public class MailServiceImpl implements MailService {
                 .findByEmail_EmailId(emailId)
                 .orElseGet(() -> EmailAnalysisResult.builder().email(email).build());
 
-        // List<Float> → float[] 변환
-        float[] embedding = toFloatArray(result.getEmailEmbedding());
-
         // entities_json: AI가 JSON 문자열로 전송 → Map으로 역직렬화
         Map<String, Object> entitiesMap = null;
         String entitiesJsonStr = result.getEntitiesJson();
@@ -147,7 +144,6 @@ public class MailServiceImpl implements MailService {
                 result.getConfidenceScore(),
                 result.getSummaryText(),
                 result.isScheduleDetected(),
-                embedding,
                 entitiesMap,
                 result.getModelVersion()
         );
@@ -245,12 +241,4 @@ public class MailServiceImpl implements MailService {
     // 내부 유틸
     // ===================================================
 
-    private float[] toFloatArray(List<Float> list) {
-        if (list == null || list.isEmpty()) return new float[0];
-        float[] arr = new float[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            arr[i] = list.get(i);
-        }
-        return arr;
-    }
 }
