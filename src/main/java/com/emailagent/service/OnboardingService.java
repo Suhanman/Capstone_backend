@@ -61,7 +61,7 @@ public class OnboardingService {
     // POST /api/business/templates/generate-initial
     // =============================================
 
-    @Transactional(readOnly = true)
+    @Transactional
     public InitialTemplateGenerateResponse generateInitialTemplates(Long userId, InitialTemplateGenerateRequest request) {
         List<Long> categoryIds = request.getCategoryIds();
         if (categoryIds == null || categoryIds.isEmpty()) {
@@ -80,44 +80,47 @@ public class OnboardingService {
         List<BusinessResource> selectedResources = resolveSelectedResources(userId, request.getResourceIds());
 
         // 3. 선택된 FAQ / PDF를 knowledge ingest 큐에 발행
-        publishKnowledgeIngest(userId, selectedFaqs, selectedResources);
+        String knowledgeJobId = publishKnowledgeIngest(userId, selectedFaqs, selectedResources);
 
         // 4. RAG context 생성
         String ragContext = businessService.buildRagContext(userId);
 
         // 5. 카테고리별로 RAG draft 큐에 템플릿 생성 요청 발행 (mode="generate")
-        for (Category category : categories) {
-            String requestId = UUID.randomUUID().toString();
-            String jobId = "rag-draft-" + userId + "-" + category.getCategoryId() + "-" + requestId;
+        List<String> draftJobIds = categories.stream()
+                .map(category -> {
+                    String requestId = UUID.randomUUID().toString();
+                    String jobId = "rag-draft-" + userId + "-" + category.getCategoryId() + "-" + requestId;
 
-            RagDraftGenerateRequestDTO message = RagDraftGenerateRequestDTO.builder()
-                    .jobId(jobId)
-                    .requestId(requestId)
-                    .userId(userId)
-                    .mode("generate")
-                    .categoryId(category.getCategoryId())
-                    .categoryName(category.getCategoryName())
-                    .industryType(request.getIndustryType())
-                    .emailTone(request.getEmailTone())
-                    .companyDescription(request.getCompanyDescription())
-                    .ragContext(ragContext)
-                    .templateCount(1)
-                    .build();
+                    RagDraftGenerateRequestDTO message = RagDraftGenerateRequestDTO.builder()
+                            .jobId(jobId)
+                            .requestId(requestId)
+                            .userId(userId)
+                            .mode("generate")
+                            .categoryId(category.getCategoryId())
+                            .categoryName(category.getCategoryName())
+                            .industryType(request.getIndustryType())
+                            .emailTone(request.getEmailTone())
+                            .companyDescription(request.getCompanyDescription())
+                            .ragContext(ragContext)
+                            .templateCount(1)
+                            .build();
 
-            ragPublisher.publishDraftGeneration(message);
+                    ragPublisher.publishDraftGeneration(message);
 
-            log.info(
-                    "[OnboardingService] RAG 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}, jobId={}, requestId={}",
-                    userId,
-                    category.getCategoryId(),
-                    category.getCategoryName(),
-                    jobId,
-                    requestId
-            );
-        }
+                    log.info(
+                            "[OnboardingService] RAG 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}, jobId={}, requestId={}",
+                            userId,
+                            category.getCategoryId(),
+                            category.getCategoryName(),
+                            jobId,
+                            requestId
+                    );
+                    return jobId;
+                })
+                .toList();
 
         // 6. processing_count = category_ids 개수 반환
-        return InitialTemplateGenerateResponse.of(categories.size());
+        return InitialTemplateGenerateResponse.of(categories.size(), draftJobIds, knowledgeJobId);
     }
 
     private List<BusinessFaq> resolveSelectedFaqs(Long userId, List<Long> faqIds) {
@@ -142,14 +145,14 @@ public class OnboardingService {
                 .toList();
     }
 
-    private void publishKnowledgeIngest(
+    private String publishKnowledgeIngest(
             Long userId,
             List<BusinessFaq> faqs,
             List<BusinessResource> resources
     ) {
         if (faqs.isEmpty() && resources.isEmpty()) {
             log.info("[OnboardingService] 선택된 FAQ/PDF가 없어 knowledge ingest 발행을 생략합니다. userId={}", userId);
-            return;
+            return null;
         }
 
         String requestId = UUID.randomUUID().toString();
@@ -181,5 +184,6 @@ public class OnboardingService {
                 .build();
 
         ragPublisher.publishKnowledgeIngest(message);
+        return jobId;
     }
 }

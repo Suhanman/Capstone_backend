@@ -3,6 +3,7 @@ package com.emailagent.service;
 import com.emailagent.domain.entity.RagJob;
 import com.emailagent.domain.entity.User;
 import com.emailagent.domain.enums.RagJobStatus;
+import com.emailagent.dto.response.onboarding.OnboardingTemplateJobStatusResponse;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
@@ -11,12 +12,17 @@ import com.emailagent.rabbitmq.dto.RagProgressEventDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateIndexResultDTO;
 import com.emailagent.repository.RagJobRepository;
 import com.emailagent.repository.UserRepository;
+import com.emailagent.sse.service.SseEmitterService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -26,10 +32,11 @@ public class RagJobService {
     private final RagJobRepository ragJobRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final SseEmitterService sseEmitterService;
 
     @Transactional
     public void createKnowledgeIngestJob(RagKnowledgeIngestRequestDTO request) {
-        upsertQueuedJob(
+        RagJob job = upsertQueuedJob(
                 request.getJobId(),
                 request.getRequestId(),
                 request.getUserId(),
@@ -40,12 +47,13 @@ public class RagJobService {
                 "지식 적재 요청 대기 중",
                 request
         );
+        pushJobUpdate(job);
     }
 
     @Transactional
     public void createDraftGenerationJob(RagDraftGenerateRequestDTO request) {
         String targetId = request.getCategoryId() != null ? String.valueOf(request.getCategoryId()) : null;
-        upsertQueuedJob(
+        RagJob job = upsertQueuedJob(
                 request.getJobId(),
                 request.getRequestId(),
                 request.getUserId(),
@@ -56,6 +64,7 @@ public class RagJobService {
                 "템플릿 생성 요청 대기 중",
                 request
         );
+        pushJobUpdate(job);
     }
 
     @Transactional
@@ -74,6 +83,7 @@ public class RagJobService {
         } else {
             job.markProcessing(progress.getProgressStep(), progress.getProgressMessage(), payloadJson);
         }
+        pushJobUpdate(job);
     }
 
     @Transactional
@@ -88,6 +98,7 @@ public class RagJobService {
             String errorMessage = result.getError() != null ? result.getError().getMessage() : null;
             job.markFailed("FAILED", "지식 적재에 실패했습니다.", errorCode, errorMessage, payloadJson);
         }
+        pushJobUpdate(job);
     }
 
     @Transactional
@@ -103,9 +114,20 @@ public class RagJobService {
             String errorMessage = result.getError() != null ? result.getError().getMessage() : null;
             job.markFailed("FAILED", "템플릿 인덱싱에 실패했습니다.", errorCode, errorMessage, payloadJson);
         }
+        pushJobUpdate(job);
     }
 
-    private void upsertQueuedJob(
+    @Transactional(readOnly = true)
+    public OnboardingTemplateJobStatusResponse getTemplateGenerationJobs(Long userId, List<String> jobIds) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return OnboardingTemplateJobStatusResponse.of(List.of());
+        }
+
+        List<RagJob> jobs = ragJobRepository.findByUser_UserIdAndJobIdInOrderByCreatedAtAsc(userId, jobIds);
+        return OnboardingTemplateJobStatusResponse.of(jobs);
+    }
+
+    private RagJob upsertQueuedJob(
             String jobId,
             String requestId,
             Long userId,
@@ -118,6 +140,7 @@ public class RagJobService {
     ) {
         RagJob job = getOrCreate(jobId, userId, requestId, jobType, targetType, targetId);
         job.markQueued(progressStep, progressMessage, toJson(payload));
+        return job;
     }
 
     private RagJob getExisting(String jobId) {
@@ -162,5 +185,26 @@ public class RagJobService {
             log.warn("[RagJobService] payload JSON 직렬화 실패: {}", e.getMessage());
             return null;
         }
+    }
+
+    private void pushJobUpdate(RagJob job) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("job_id", job.getJobId());
+        payload.put("request_id", job.getRequestId());
+        payload.put("job_type", job.getJobType());
+        payload.put("target_type", job.getTargetType());
+        payload.put("target_id", job.getTargetId());
+        payload.put("status", job.getStatus().name());
+        payload.put("progress_step", job.getProgressStep());
+        payload.put("progress_message", job.getProgressMessage());
+        payload.put("error_code", job.getErrorCode());
+        payload.put("error_message", job.getErrorMessage());
+        payload.put("completed_at", job.getCompletedAt());
+
+        sseEmitterService.sendEventToUser(
+                job.getUser().getUserId(),
+                "rag-job-updated",
+                payload
+        );
     }
 }

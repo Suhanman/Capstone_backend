@@ -1,7 +1,6 @@
 package com.emailagent.sse.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -23,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
-@Profile("sse")
 public class SseEmitterService {
 
     private static final long SSE_TIMEOUT_MS = 30 * 60 * 1000L; // 30분
@@ -75,5 +73,23 @@ public class SseEmitterService {
                 emitter.completeWithError(e);
             }
         });
+    }
+
+    public void sendEventToUser(Long userId, String eventName, Object data) {
+        SseEmitter emitter = emitterMap.get(userId);
+        if (emitter == null) {
+            return;
+        }
+
+        try {
+            emitter.send(SseEmitter.event()
+                    .name(eventName)
+                    .data(data));
+            log.debug("[SseEmitterService] SSE 전송 — userId={}, event={}", userId, eventName);
+        } catch (IOException e) {
+            log.warn("[SseEmitterService] 전송 실패, emitter 제거 — userId={}, event={}", userId, eventName);
+            emitterMap.remove(userId);
+            emitter.completeWithError(e);
+        }
     }
 }

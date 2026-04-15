@@ -3,7 +3,6 @@ package com.emailagent.sse.controller;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.sse.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +18,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/mail")
 @RequiredArgsConstructor
-@Profile("sse")
 public class SSEController {
 
     private final SseEmitterService sseEmitterService;

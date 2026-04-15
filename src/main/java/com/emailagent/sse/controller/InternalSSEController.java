@@ -2,7 +2,6 @@ package com.emailagent.sse.controller;
 
 import com.emailagent.sse.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/internal/sse")
 @RequiredArgsConstructor
-@Profile("sse")
 public class InternalSSEController {
 
     private final SseEmitterService sseEmitterService;
