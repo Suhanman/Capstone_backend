@@ -35,8 +35,14 @@ public class RabbitMQConfig {
     // ===================================================
     public static final String QUEUE_CLASSIFY_INBOUND  = "q.2ai.classify";
     public static final String QUEUE_CLASSIFY_RESULT   = "q.2app.classify";
+    public static final String QUEUE_KNOWLEDGE_INGEST_INBOUND = "q.2rag.knowledge.ingest";
+    public static final String QUEUE_KNOWLEDGE_INGEST_RESULT  = "q.2app.knowledge.ingest";
     public static final String QUEUE_RAG_DRAFT_INBOUND = "q.2rag.draft";
     public static final String QUEUE_RAG_DRAFT_RESULT  = "q.2app.rag.draft";
+    public static final String QUEUE_TEMPLATE_INDEX_INBOUND = "q.2rag.templates.index";
+    public static final String QUEUE_TEMPLATE_INDEX_RESULT  = "q.2app.templates.index";
+    public static final String QUEUE_TEMPLATE_MATCH_INBOUND = "q.2rag.templates.match";
+    public static final String QUEUE_TEMPLATE_MATCH_RESULT  = "q.2app.templates.match";
     public static final String QUEUE_RAG_PROGRESS      = "q.2app.rag.progress";
     public static final String QUEUE_DLX_FAILED        = "q.dlx.failed";
 
@@ -45,8 +51,14 @@ public class RabbitMQConfig {
     // ===================================================
     public static final String RK_CLASSIFY_INBOUND = "2ai.classify";
     public static final String RK_CLASSIFY_RESULT  = "2app.classify";
+    public static final String RK_KNOWLEDGE_INGEST_INBOUND = "2rag.knowledge.ingest";
+    public static final String RK_KNOWLEDGE_INGEST_RESULT  = "2app.knowledge.ingest";
     public static final String RK_RAG_DRAFT_INBOUND = "2rag.draft";
     public static final String RK_RAG_DRAFT_RESULT  = "2app.rag.draft";
+    public static final String RK_TEMPLATE_INDEX_INBOUND = "2rag.templates.index";
+    public static final String RK_TEMPLATE_INDEX_RESULT  = "2app.templates.index";
+    public static final String RK_TEMPLATE_MATCH_INBOUND = "2rag.templates.match";
+    public static final String RK_TEMPLATE_MATCH_RESULT  = "2app.templates.match";
     public static final String RK_RAG_PROGRESS      = "2app.rag.progress";
 
     // ===================================================

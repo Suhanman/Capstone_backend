@@ -5,13 +5,17 @@ import com.emailagent.dto.request.onboarding.InitialTemplateGenerateRequest;
 import com.emailagent.dto.response.onboarding.InitialTemplateGenerateResponse;
 import com.emailagent.dto.response.onboarding.OnboardingStatusResponse;
 import com.emailagent.exception.ResourceNotFoundException;
-import com.emailagent.rabbitmq.config.RabbitMQConfig;
 import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
+import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
+import com.emailagent.rabbitmq.publisher.RagPublisher;
+import com.emailagent.domain.entity.BusinessFaq;
+import com.emailagent.domain.entity.BusinessResource;
 import com.emailagent.repository.CategoryRepository;
+import com.emailagent.repository.BusinessFaqRepository;
+import com.emailagent.repository.BusinessResourceRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +29,10 @@ public class OnboardingService {
 
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final BusinessFaqRepository faqRepository;
+    private final BusinessResourceRepository resourceRepository;
     private final BusinessService businessService;
-    private final RabbitTemplate rabbitTemplate;
+    private final RagPublisher ragPublisher;
 
     // =============================================
     // GET /api/onboarding/status
@@ -69,10 +75,17 @@ public class OnboardingService {
                         .orElseThrow(() -> new ResourceNotFoundException("카테고리를 찾을 수 없습니다: " + id)))
                 .toList();
 
-        // 2. RAG context 생성
+        // 2. 지식 적재용 FAQ / PDF 수집
+        List<BusinessFaq> selectedFaqs = resolveSelectedFaqs(userId, request.getFaqIds());
+        List<BusinessResource> selectedResources = resolveSelectedResources(userId, request.getResourceIds());
+
+        // 3. 선택된 FAQ / PDF를 knowledge ingest 큐에 발행
+        publishKnowledgeIngest(userId, selectedFaqs, selectedResources);
+
+        // 4. RAG context 생성
         String ragContext = businessService.buildRagContext(userId);
 
-        // 3. 카테고리별로 RAG draft 큐에 템플릿 생성 요청 발행 (mode="generate")
+        // 5. 카테고리별로 RAG draft 큐에 템플릿 생성 요청 발행 (mode="generate")
         for (Category category : categories) {
             String requestId = UUID.randomUUID().toString();
             String jobId = "rag-draft-" + userId + "-" + category.getCategoryId() + "-" + requestId;
@@ -91,11 +104,7 @@ public class OnboardingService {
                     .templateCount(1)
                     .build();
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.EXCHANGE_APP2RAG,
-                    RabbitMQConfig.RK_RAG_DRAFT_INBOUND,
-                    message
-            );
+            ragPublisher.publishDraftGeneration(message);
 
             log.info(
                     "[OnboardingService] RAG 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}, jobId={}, requestId={}",
@@ -107,7 +116,70 @@ public class OnboardingService {
             );
         }
 
-        // 4. processing_count = category_ids 개수 반환
+        // 6. processing_count = category_ids 개수 반환
         return InitialTemplateGenerateResponse.of(categories.size());
+    }
+
+    private List<BusinessFaq> resolveSelectedFaqs(Long userId, List<Long> faqIds) {
+        if (faqIds == null || faqIds.isEmpty()) {
+            return List.of();
+        }
+
+        return faqIds.stream()
+                .map(faqId -> faqRepository.findByFaqIdAndUser_UserId(faqId, userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("FAQ를 찾을 수 없습니다: " + faqId)))
+                .toList();
+    }
+
+    private List<BusinessResource> resolveSelectedResources(Long userId, List<Long> resourceIds) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return List.of();
+        }
+
+        return resourceIds.stream()
+                .map(resourceId -> resourceRepository.findByResourceIdAndUser_UserId(resourceId, userId)
+                        .orElseThrow(() -> new ResourceNotFoundException("파일을 찾을 수 없습니다: " + resourceId)))
+                .toList();
+    }
+
+    private void publishKnowledgeIngest(
+            Long userId,
+            List<BusinessFaq> faqs,
+            List<BusinessResource> resources
+    ) {
+        if (faqs.isEmpty() && resources.isEmpty()) {
+            log.info("[OnboardingService] 선택된 FAQ/PDF가 없어 knowledge ingest 발행을 생략합니다. userId={}", userId);
+            return;
+        }
+
+        String requestId = UUID.randomUUID().toString();
+        String jobId = "rag-ingest-" + userId + "-" + requestId;
+
+        RagKnowledgeIngestRequestDTO message = RagKnowledgeIngestRequestDTO.builder()
+                .jobId(jobId)
+                .requestId(requestId)
+                .userId(userId)
+                .payload(
+                        RagKnowledgeIngestRequestDTO.Payload.builder()
+                                .faqs(faqs.stream()
+                                        .map(faq -> RagKnowledgeIngestRequestDTO.FaqItem.builder()
+                                                .sourceId("faq-" + faq.getFaqId())
+                                                .question(faq.getQuestion())
+                                                .answer(faq.getAnswer())
+                                                .build())
+                                        .toList())
+                                .manuals(resources.stream()
+                                        .map(resource -> RagKnowledgeIngestRequestDTO.ManualItem.builder()
+                                                .sourceId("manual-" + resource.getResourceId())
+                                                .title(resource.getTitle())
+                                                .fileName(resource.getFileName())
+                                                .localPath(resource.getFilePath())
+                                                .build())
+                                        .toList())
+                                .build()
+                )
+                .build();
+
+        ragPublisher.publishKnowledgeIngest(message);
     }
 }

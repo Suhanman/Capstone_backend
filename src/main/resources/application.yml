@@ -37,15 +37,27 @@ app:
     queue:
       classify-inbound: q.2ai.classify
       classify-result: q.2app.classify
+      knowledge-ingest-inbound: q.2rag.knowledge.ingest
+      knowledge-ingest-result: q.2app.knowledge.ingest
       rag-draft-inbound: q.2rag.draft
       rag-draft-result: q.2app.rag.draft
+      template-index-inbound: q.2rag.templates.index
+      template-index-result: q.2app.templates.index
+      template-match-inbound: q.2rag.templates.match
+      template-match-result: q.2app.templates.match
       rag-progress: q.2app.rag.progress
       dlx-failed: q.dlx.failed
     routing-key:
       classify-inbound: 2ai.classify
       classify-result: 2app.classify
+      knowledge-ingest-inbound: 2rag.knowledge.ingest
+      knowledge-ingest-result: 2app.knowledge.ingest
       rag-draft-inbound: 2rag.draft
       rag-draft-result: 2app.rag.draft
+      template-index-inbound: 2rag.templates.index
+      template-index-result: 2app.templates.index
+      template-match-inbound: 2rag.templates.match
+      template-match-result: 2app.templates.match
       rag-progress: 2app.rag.progress
 
   ai:
