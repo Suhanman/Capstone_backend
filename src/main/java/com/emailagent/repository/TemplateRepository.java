@@ -21,6 +21,8 @@ public interface TemplateRepository extends JpaRepository<Template, Long> {
     Optional<Template> findBestMatchingTemplate(@Param("userId") Long userId,
                                                 @Param("categoryId") Long categoryId);
 
+    Optional<Template> findByUser_UserIdAndCategory_CategoryIdAndVariantLabel(Long userId, Long categoryId, String variantLabel);
+
     // 관리자 - 전체 템플릿 페이징 (user FETCH JOIN으로 N+1 방지)
     @Query(value = "SELECT t FROM Template t JOIN FETCH t.user ORDER BY t.createdAt DESC",
            countQuery = "SELECT COUNT(t) FROM Template t")

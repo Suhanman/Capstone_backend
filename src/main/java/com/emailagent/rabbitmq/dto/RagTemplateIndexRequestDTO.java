@@ -43,5 +43,24 @@ public class RagTemplateIndexRequestDTO {
 
         @JsonProperty("email_tone")
         private String emailTone;
+
+        @JsonProperty("metadata")
+        private Metadata metadata;
+    }
+
+    @Getter
+    @Builder
+    public static class Metadata {
+        @JsonProperty("template_purpose")
+        private String templatePurpose;
+
+        @JsonProperty("search_summary")
+        private String searchSummary;
+
+        @JsonProperty("semantic_keywords")
+        private List<String> semanticKeywords;
+
+        @JsonProperty("recommended_situations")
+        private List<String> recommendedSituations;
     }
 }

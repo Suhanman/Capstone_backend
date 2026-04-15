@@ -2,7 +2,7 @@ package com.emailagent.rabbitmq.consumer;
 
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.config.RabbitMQConfig;
-import com.emailagent.rabbitmq.dto.RagDraftGenerateResultDTO;
+import com.emailagent.rabbitmq.dto.RagTemplateMatchResultDTO;
 import com.emailagent.service.RagJobService;
 import com.emailagent.service.RagResultService;
 import com.rabbitmq.client.Channel;
@@ -18,34 +18,31 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * RAG -> App 결과 메시지 수신 컨슈머.
- *
- * 현재는 온보딩 템플릿 생성 결과를 받아 Template 저장 및 templates.index 발행까지 담당한다.
+ * RAG template match 결과 수신 컨슈머.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class RagResultConsumer {
+public class RagTemplateMatchResultConsumer {
 
     private final RagResultService ragResultService;
     private final RagJobService ragJobService;
     private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(
-            queues = RabbitMQConfig.QUEUE_RAG_DRAFT_RESULT,
+            queues = RabbitMQConfig.QUEUE_TEMPLATE_MATCH_RESULT,
             ackMode = "MANUAL",
             containerFactory = "rabbitListenerContainerFactory"
     )
-    public void consumeDraftResult(RagDraftGenerateResultDTO result, Message message, Channel channel)
+    public void consumeTemplateMatchResult(RagTemplateMatchResultDTO result, Message message, Channel channel)
             throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
 
         try {
             int retryCount = extractRetryCount(message);
-
             if (retryCount >= OutboxPolicy.MAX_RETRY) {
                 log.error(
-                        "[RagResultConsumer] 최대 재시도 초과 → FAILED — requestId={}, jobId={}, retryCount={}",
+                        "[RagTemplateMatchResultConsumer] 최대 재시도 초과 → DLQ 이동 — requestId={}, jobId={}, retryCount={}",
                         result.getRequestId(),
                         result.getJobId(),
                         retryCount
@@ -55,13 +52,13 @@ public class RagResultConsumer {
                 return;
             }
 
-            ragResultService.handleDraftGenerated(result);
-            ragJobService.completeDraftGeneration(result);
+            ragResultService.handleTemplateMatched(result);
+            ragJobService.completeTemplateMatch(result);
             channel.basicAck(deliveryTag, false);
 
         } catch (Exception e) {
             log.error(
-                    "[RagResultConsumer] draft result 처리 실패 → nack — requestId={}, jobId={}, error={}",
+                    "[RagTemplateMatchResultConsumer] templates.match 처리 실패 → nack — requestId={}, jobId={}, error={}",
                     result.getRequestId(),
                     result.getJobId(),
                     e.getMessage(),

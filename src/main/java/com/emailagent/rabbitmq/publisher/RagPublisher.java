@@ -3,6 +3,7 @@ package com.emailagent.rabbitmq.publisher;
 import com.emailagent.rabbitmq.config.RabbitMQConfig;
 import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
+import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateIndexRequestDTO;
 import com.emailagent.service.RagJobService;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +78,26 @@ public class RagPublisher {
         log.info(
                 "[RagPublisher] template index 발행 완료 — userId={}, requestId={}",
                 payload.getUserId(),
+                payload.getRequestId()
+        );
+    }
+
+    public void publishTemplateMatch(RagTemplateMatchRequestDTO payload) {
+        ragJobService.createTemplateMatchJob(payload);
+        CorrelationData correlationData = new CorrelationData(payload.getRequestId());
+
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_APP2RAG,
+                RabbitMQConfig.RK_TEMPLATE_MATCH_INBOUND,
+                payload,
+                correlationData
+        );
+
+        log.info(
+                "[RagPublisher] template match 발행 완료 — userId={}, emailId={}, jobId={}, requestId={}",
+                payload.getUserId(),
+                payload.getPayload() != null ? payload.getPayload().getEmailId() : null,
+                payload.getJobId(),
                 payload.getRequestId()
         );
     }

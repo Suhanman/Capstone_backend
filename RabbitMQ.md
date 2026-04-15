@@ -122,6 +122,18 @@
 
 
 ## RabbitMQ 리소스 설정 (Terraform을 통한 관리. spec.md에서는 명시만 함.)
+운영형 RabbitMQ 리소스는 기존 AI/classify 파이프라인과 동일한 원칙을 따른다.
+
+- request / result / progress queue 모두 `durable=true`
+- queue 직접 실패는 `x.retry.direct` 로 dead-letter
+- retry queue는 `x-message-ttl=30000` 후 원래 exchange / routing key로 복귀
+- 최종 3회 실패 메시지는 `q.dlx.failed` 또는 `*.dlq` 로 모은다
+
+주의:
+
+- 로컬 smoke test에서는 `durable` 위주의 최소 토폴로지만 선언해서 worker 로직을 확인할 수 있다.
+- 그러나 운영 리소스 기준은 아래 문서에 적은 `DLX / DLQ / TTL / retry` 정책을 따른다.
+
 ### Exchange
 #### x.app2ai.direct
 Type : direct
@@ -230,6 +242,42 @@ binding key: 2app.rag.progress
 DLX: x.retry.direct
 x-dead-letter-routing-key: 2app.rag.progress.retry
 
+#### q.2rag.knowledge.ingest.dlq
+durable: true
+최종 실패한 knowledge ingest 메시지 보관
+
+#### q.2app.knowledge.ingest.dlq
+durable: true
+최종 실패한 knowledge ingest 결과 메시지 보관
+
+#### q.2rag.draft.dlq
+durable: true
+최종 실패한 RAG draft 요청 메시지 보관
+
+#### q.2app.rag.draft.dlq
+durable: true
+최종 실패한 RAG draft 결과 메시지 보관
+
+#### q.2rag.templates.index.dlq
+durable: true
+최종 실패한 template index 요청 메시지 보관
+
+#### q.2app.templates.index.dlq
+durable: true
+최종 실패한 template index 결과 메시지 보관
+
+#### q.2rag.templates.match.dlq
+durable: true
+최종 실패한 template match 요청 메시지 보관
+
+#### q.2app.templates.match.dlq
+durable: true
+최종 실패한 template match 결과 메시지 보관
+
+#### q.2app.rag.progress.dlq
+durable: true
+최종 실패한 progress 이벤트 보관
+
 
 #### q.2ai.classify.retry
 durable: true
@@ -315,6 +363,19 @@ x-message-ttl: 30000
 x-dead-letter-exchange: x.rag2app.direct
 x-dead-letter-routing-key: 2app.rag.progress
 binding key : 2app.rag.progress.retry
+
+retry / DLQ 운영 기준 요약:
+
+```text
+요청 queue
+-> 실패 시 *.retry 로 이동
+-> 30초 후 원래 queue 로 복귀
+-> 3회 초과 시 *.dlq 또는 q.dlx.failed 로 이동
+
+결과 / progress queue
+-> 동일한 retry 정책 적용
+-> Backend consumer 장애에도 메시지 유실 방지
+```
 
 
 

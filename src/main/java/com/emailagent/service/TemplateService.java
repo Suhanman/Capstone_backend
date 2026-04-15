@@ -56,6 +56,7 @@ public class TemplateService {
                 .user(user)
                 .category(category)
                 .title(request.getTitle())
+                .variantLabel(null)
                 .subjectTemplate(request.getSubjectTemplate())
                 .bodyTemplate(request.getBodyTemplate())
                 .build();
@@ -69,7 +70,12 @@ public class TemplateService {
                 .filter(t -> t.getUser().getUserId().equals(userId))
                 .orElseThrow(() -> new TemplateNotFoundException(templateId));
 
-        template.update(request.getTitle(), request.getSubjectTemplate(), request.getBodyTemplate());
+        template.update(
+                request.getTitle(),
+                template.getVariantLabel(),
+                request.getSubjectTemplate(),
+                request.getBodyTemplate()
+        );
         return TemplateResponse.from(template);
     }
 

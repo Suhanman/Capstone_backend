@@ -38,12 +38,16 @@ public class RecommendedDraftResponse extends BaseResponse {
         @JsonProperty("email_id")
         private final Long emailId;
 
-        public DraftItem(Long draftId, String subject, String body, double similarity, Long emailId) {
+        @JsonProperty("template_title")
+        private final String templateTitle;
+
+        public DraftItem(Long draftId, String subject, String body, double similarity, Long emailId, String templateTitle) {
             this.draftId = draftId;
             this.subject = subject;
             this.body = body;
             this.similarity = similarity;
             this.emailId = emailId;
+            this.templateTitle = templateTitle;
         }
     }
 }

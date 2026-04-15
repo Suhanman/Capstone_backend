@@ -102,7 +102,7 @@ public class OnboardingService {
                             .emailTone(request.getEmailTone())
                             .companyDescription(request.getCompanyDescription())
                             .ragContext(ragContext)
-                            .templateCount(1)
+                            .templateCount(3)
                             .build();
 
                     ragPublisher.publishDraftGeneration(message);

@@ -7,11 +7,11 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * RAG 온보딩 템플릿 생성 결과를 역직렬화하는 DTO.
+ * RAG 템플릿 매칭 결과 DTO.
  */
 @Getter
 @NoArgsConstructor
-public class RagDraftGenerateResultDTO {
+public class RagTemplateMatchResultDTO {
 
     @JsonProperty("job_id")
     private String jobId;
@@ -34,33 +34,27 @@ public class RagDraftGenerateResultDTO {
     @Getter
     @NoArgsConstructor
     public static class Payload {
-        @JsonProperty("category_id")
-        private Long categoryId;
+        @JsonProperty("emailId")
+        private String emailId;
 
-        @JsonProperty("category_name")
-        private String categoryName;
-
-        @JsonProperty("templates")
-        private List<TemplateItem> templates;
+        @JsonProperty("results")
+        private List<ResultItem> results;
     }
 
     @Getter
     @NoArgsConstructor
-    public static class TemplateItem {
-        @JsonProperty("variant_label")
-        private String variantLabel;
-
-        @JsonProperty("template_purpose")
-        private String templatePurpose;
+    public static class ResultItem {
+        @JsonProperty("template_id")
+        private Long templateId;
 
         @JsonProperty("title")
         private String title;
 
-        @JsonProperty("subject_template")
-        private String subjectTemplate;
+        @JsonProperty("intent")
+        private String intent;
 
-        @JsonProperty("body_template")
-        private String bodyTemplate;
+        @JsonProperty("score")
+        private Double score;
     }
 
     @Getter
