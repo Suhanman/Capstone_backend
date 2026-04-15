@@ -21,8 +21,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * MailService 구현체.
@@ -125,6 +128,19 @@ public class MailServiceImpl implements MailService {
         // List<Float> → float[] 변환
         float[] embedding = toFloatArray(result.getEmailEmbedding());
 
+        // entities_json: AI가 JSON 문자열로 전송 → Map으로 역직렬화
+        Map<String, Object> entitiesMap = null;
+        String entitiesJsonStr = result.getEntitiesJson();
+        if (entitiesJsonStr != null && !entitiesJsonStr.isBlank()) {
+            try {
+                entitiesMap = new ObjectMapper().readValue(
+                        entitiesJsonStr, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception e) {
+                log.warn("[MailService] entities_json 파싱 실패 — outboxId={}, raw={}",
+                        result.getOutboxId(), entitiesJsonStr, e);
+            }
+        }
+
         analysisResult.updateFromClassify(
                 result.getDomain(),
                 result.getIntent(),
@@ -132,7 +148,7 @@ public class MailServiceImpl implements MailService {
                 result.getSummaryText(),
                 result.isScheduleDetected(),
                 embedding,
-                result.getEntitiesJson(),
+                entitiesMap,
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);

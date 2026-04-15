@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -332,6 +333,34 @@ public class InboxService {
                 : "application/octet-stream";
 
         return new AttachmentDownloadResult(data, meta.getFileName(), mimeType);
+    }
+
+    // =============================================
+    // POST /api/inbox/test-seed
+    // =============================================
+
+    @Transactional
+    public Map<String, Object> seedTestEmail(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
+
+        Email email = Email.builder()
+                .user(user)
+                .externalMsgId("test-" + UUID.randomUUID())
+                .senderName("테스트 발신자")
+                .senderEmail("test@example.com")
+                .subject("테스트 메일 제목")
+                .bodyRaw("테스트 본문 원문")
+                .bodyClean("테스트 본문")
+                .receivedAt(LocalDateTime.now())
+                .build();
+
+        Email saved = emailRepository.save(email);
+
+        return Map.of(
+                "message", "테스트 메일이 생성되었습니다.",
+                "email_id", saved.getEmailId()
+        );
     }
 
     // =============================================

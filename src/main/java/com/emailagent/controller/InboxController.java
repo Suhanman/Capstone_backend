@@ -97,6 +97,12 @@ public class InboxController {
                 .body(result.data());
     }
 
+    // POST /api/inbox/test-seed
+    @PostMapping("/test-seed")
+    public ResponseEntity<?> seedTestEmail(@CurrentUser Long userId) {
+        return ResponseEntity.ok(inboxService.seedTestEmail(userId));
+    }
+
     // POST /api/inbox/{email_id}/calendar
     @PostMapping("/{emailId}/calendar")
     public ResponseEntity<InboxActionResponse> processCalendar(
