@@ -9,7 +9,9 @@ import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
+import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.event.SseNotifyEvent;
+import com.emailagent.rabbitmq.publisher.RagPublisher;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.OutboxRepository;
@@ -47,6 +49,7 @@ public class MailServiceImpl implements MailService {
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
     private final EmailAnalysisResultRepository analysisResultRepository;
+    private final RagPublisher ragPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
     // ===================================================
@@ -122,20 +125,17 @@ public class MailServiceImpl implements MailService {
                 .findByEmail_EmailId(emailId)
                 .orElseGet(() -> EmailAnalysisResult.builder().email(email).build());
 
-        // List<Float> → float[] 변환
-        float[] embedding = toFloatArray(result.getEmailEmbedding());
-
         analysisResult.updateFromClassify(
                 result.getDomain(),
                 result.getIntent(),
                 result.getConfidenceScore(),
                 result.getSummaryText(),
                 result.isScheduleDetected(),
-                embedding,
                 result.getEntitiesJson(),
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);
+        publishTemplateMatch(email, analysisResult);
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
 
@@ -229,12 +229,37 @@ public class MailServiceImpl implements MailService {
     // 내부 유틸
     // ===================================================
 
-    private float[] toFloatArray(List<Float> list) {
-        if (list == null || list.isEmpty()) return new float[0];
-        float[] arr = new float[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            arr[i] = list.get(i);
+    private void publishTemplateMatch(Email email, EmailAnalysisResult analysisResult) {
+        if (analysisResult.getIntent() == null || analysisResult.getSummaryText() == null) {
+            log.debug(
+                    "[MailService] templates.match 발행 생략 — emailId={}, intent={}, summary={}",
+                    email.getEmailId(),
+                    analysisResult.getIntent(),
+                    analysisResult.getSummaryText()
+            );
+            return;
         }
-        return arr;
+
+        String requestId = "template-match-" + email.getEmailId();
+        String jobId = "template-match-" + email.getEmailId();
+
+        RagTemplateMatchRequestDTO payload = RagTemplateMatchRequestDTO.builder()
+                .jobId(jobId)
+                .requestId(requestId)
+                .userId(email.getUser().getUserId())
+                .payload(
+                        RagTemplateMatchRequestDTO.Payload.builder()
+                                .emailId(String.valueOf(email.getEmailId()))
+                                .subject(email.getSubject())
+                                .body(email.getBodyClean())
+                                .summary(analysisResult.getSummaryText())
+                                .intent(analysisResult.getIntent())
+                                .domain(analysisResult.getDomain())
+                                .topK(3)
+                                .build()
+                )
+                .build();
+
+        ragPublisher.publishTemplateMatch(payload);
     }
 }

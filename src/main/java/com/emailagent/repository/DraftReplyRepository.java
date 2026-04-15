@@ -43,20 +43,4 @@ public interface DraftReplyRepository extends JpaRepository<DraftReply, Long> {
            nativeQuery = true)
     List<Object[]> countDraftsGroupedByDate(@Param("start") LocalDateTime start);
 
-    /**
-     * reply_embedding 기준 코사인 유사도 상위 topK 초안 조회 (MariaDB VEC_DISTANCE_COSINE)
-     * embedding: 비교 대상 이메일의 email_embedding (byte[])
-     * similarity 오름차순(거리 기준) = 유사한 것이 먼저 나옴
-     */
-    @Query(value = """
-            SELECT d.draft_reply_id, d.draft_subject, d.draft_content,
-                   VEC_DISTANCE_COSINE(d.reply_embedding, :embedding) AS similarity,
-                   d.email_id
-            FROM DraftReplies d
-            WHERE d.reply_embedding IS NOT NULL
-            ORDER BY similarity ASC
-            LIMIT :topK
-            """, nativeQuery = true)
-    List<Object[]> findTopKSimilarDrafts(@Param("embedding") byte[] embedding,
-                                          @Param("topK") int topK);
 }

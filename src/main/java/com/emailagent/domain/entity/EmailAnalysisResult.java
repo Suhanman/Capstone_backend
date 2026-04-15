@@ -1,6 +1,5 @@
 package com.emailagent.domain.entity;
 
-import com.emailagent.converter.VectorConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -58,11 +57,6 @@ public class EmailAnalysisResult {
     @Column(name = "entities_json", columnDefinition = "JSON")
     private Map<String, Object> entitiesJson;
 
-    // AI가 생성한 이메일 임베딩 벡터 (MariaDB VECTOR(384) 바이너리)
-    @Column(name = "email_embedding")
-    @Convert(converter = VectorConverter.class)
-    private float[] emailEmbedding;
-
     @Column(name = "model_version", length = 50)
     private String modelVersion;
 
@@ -88,17 +82,15 @@ public class EmailAnalysisResult {
 
     /**
      * classify 큐 AI 결과 수신 후 업데이트
-     * emailEmbedding: float[] (MariaDB VECTOR(384) 바이너리로 저장)
      */
     public void updateFromClassify(String domain, String intent, BigDecimal confidenceScore,
-                                   String summaryText, boolean scheduleDetected, float[] emailEmbedding,
+                                   String summaryText, boolean scheduleDetected,
                                    Map<String, Object> entitiesJson, String modelVersion) {
         this.domain = domain;
         this.intent = intent;
         this.confidenceScore = confidenceScore;
         this.summaryText = summaryText;
         this.scheduleDetected = scheduleDetected;
-        this.emailEmbedding = emailEmbedding;
         this.entitiesJson = entitiesJson;
         this.modelVersion = modelVersion;
     }
