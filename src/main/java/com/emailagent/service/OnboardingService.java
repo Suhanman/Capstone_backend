@@ -98,6 +98,7 @@ public class OnboardingService {
                             .mode("generate")
                             .categoryId(category.getCategoryId())
                             .categoryName(category.getCategoryName())
+                            .categoryKeywords(category.getKeywords())
                             .industryType(request.getIndustryType())
                             .emailTone(request.getEmailTone())
                             .companyDescription(request.getCompanyDescription())

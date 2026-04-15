@@ -117,6 +117,7 @@ CREATE TABLE categories (
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_name VARCHAR(100) NOT NULL, -- 카테고리명
     color VARCHAR(30), -- 표시 색상
+    keywords TEXT NULL, -- 카테고리별 검색 키워드(JSON 배열)
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
 

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 /**
  * 온보딩 초기 템플릿 생성을 RAG worker에 요청하는 메시지 DTO.
  *
@@ -31,6 +33,9 @@ public class RagDraftGenerateRequestDTO {
 
     @JsonProperty("category_name")
     private String categoryName;
+
+    @JsonProperty("category_keywords")
+    private List<String> categoryKeywords;
 
     @JsonProperty("industry_type")
     private String industryType;

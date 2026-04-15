@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @Builder
 public class CategoryResponse extends BaseResponse {
@@ -18,11 +20,14 @@ public class CategoryResponse extends BaseResponse {
 
     private String color;
 
+    private List<String> keywords;
+
     public static CategoryResponse from(Category category) {
         return CategoryResponse.builder()
                 .categoryId(category.getCategoryId())
                 .categoryName(category.getCategoryName())
                 .color(category.getColor())
+                .keywords(category.getKeywords())
                 .build();
     }
 }
