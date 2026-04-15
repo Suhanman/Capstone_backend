@@ -84,7 +84,7 @@ public class RagResultService {
     }
 
     private void publishTemplateIndex(Template template, Category category) {
-        String requestId = UUID.randomUUID().toString();
+        String requestId = "template-index-" + template.getTemplateId();
         String emailTone = profileRepository.findByUser_UserId(category.getUser().getUserId())
                 .map(profile -> profile.getEmailTone() != null ? profile.getEmailTone().name() : null)
                 .orElse(null);

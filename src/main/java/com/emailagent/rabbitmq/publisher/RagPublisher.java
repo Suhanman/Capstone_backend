@@ -4,6 +4,7 @@ import com.emailagent.rabbitmq.config.RabbitMQConfig;
 import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateIndexRequestDTO;
+import com.emailagent.service.RagJobService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
@@ -22,8 +23,10 @@ import org.springframework.stereotype.Component;
 public class RagPublisher {
 
     private final RabbitTemplate rabbitTemplate;
+    private final RagJobService ragJobService;
 
     public void publishKnowledgeIngest(RagKnowledgeIngestRequestDTO payload) {
+        ragJobService.createKnowledgeIngestJob(payload);
         CorrelationData correlationData = new CorrelationData(payload.getRequestId());
 
         rabbitTemplate.convertAndSend(
@@ -42,6 +45,7 @@ public class RagPublisher {
     }
 
     public void publishDraftGeneration(RagDraftGenerateRequestDTO payload) {
+        ragJobService.createDraftGenerationJob(payload);
         CorrelationData correlationData = new CorrelationData(payload.getRequestId());
 
         rabbitTemplate.convertAndSend(
