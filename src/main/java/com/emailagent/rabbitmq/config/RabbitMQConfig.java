@@ -27,14 +27,17 @@ public class RabbitMQConfig {
     // ===================================================
     public static final String EXCHANGE_APP2AI = "x.app2ai.direct";
     public static final String EXCHANGE_AI2APP = "x.ai2app.direct";
+    public static final String EXCHANGE_APP2RAG = "x.app2rag.direct";
+    public static final String EXCHANGE_RAG2APP = "x.rag2app.direct";
 
     // ===================================================
     // Queue 이름 상수
     // ===================================================
     public static final String QUEUE_CLASSIFY_INBOUND  = "q.2ai.classify";
     public static final String QUEUE_CLASSIFY_RESULT   = "q.2app.classify";
-    public static final String QUEUE_DRAFT_INBOUND     = "q.2ai.draft";
-    public static final String QUEUE_DRAFT_RESULT      = "q.2app.draft";
+    public static final String QUEUE_RAG_DRAFT_INBOUND = "q.2rag.draft";
+    public static final String QUEUE_RAG_DRAFT_RESULT  = "q.2app.rag.draft";
+    public static final String QUEUE_RAG_PROGRESS      = "q.2app.rag.progress";
     public static final String QUEUE_DLX_FAILED        = "q.dlx.failed";
 
     // ===================================================
@@ -42,8 +45,9 @@ public class RabbitMQConfig {
     // ===================================================
     public static final String RK_CLASSIFY_INBOUND = "2ai.classify";
     public static final String RK_CLASSIFY_RESULT  = "2app.classify";
-    public static final String RK_DRAFT_INBOUND    = "2ai.draft";
-    public static final String RK_DRAFT_RESULT     = "2app.draft";
+    public static final String RK_RAG_DRAFT_INBOUND = "2rag.draft";
+    public static final String RK_RAG_DRAFT_RESULT  = "2app.rag.draft";
+    public static final String RK_RAG_PROGRESS      = "2app.rag.progress";
 
     // ===================================================
     // JSON 메시지 컨버터

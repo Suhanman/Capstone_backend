@@ -6,6 +6,7 @@ import com.emailagent.dto.response.onboarding.InitialTemplateGenerateResponse;
 import com.emailagent.dto.response.onboarding.OnboardingStatusResponse;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.rabbitmq.config.RabbitMQConfig;
+import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -72,26 +72,39 @@ public class OnboardingService {
         // 2. RAG context 생성
         String ragContext = businessService.buildRagContext(userId);
 
-        // 3. 카테고리별로 email.draft 큐에 템플릿 생성 요청 발행 (mode="generate")
+        // 3. 카테고리별로 RAG draft 큐에 템플릿 생성 요청 발행 (mode="generate")
         for (Category category : categories) {
-            Map<String, Object> message = new HashMap<>();
-            message.put("user_id", userId);
-            message.put("category_id", category.getCategoryId());
-            message.put("category_name", category.getCategoryName());
-            message.put("industry_type", request.getIndustryType());
-            message.put("email_tone", request.getEmailTone());
-            message.put("company_description", request.getCompanyDescription());
-            message.put("rag_context", ragContext);
-            message.put("mode", "generate");
+            String requestId = UUID.randomUUID().toString();
+            String jobId = "rag-draft-" + userId + "-" + category.getCategoryId() + "-" + requestId;
+
+            RagDraftGenerateRequestDTO message = RagDraftGenerateRequestDTO.builder()
+                    .jobId(jobId)
+                    .requestId(requestId)
+                    .userId(userId)
+                    .mode("generate")
+                    .categoryId(category.getCategoryId())
+                    .categoryName(category.getCategoryName())
+                    .industryType(request.getIndustryType())
+                    .emailTone(request.getEmailTone())
+                    .companyDescription(request.getCompanyDescription())
+                    .ragContext(ragContext)
+                    .templateCount(1)
+                    .build();
 
             rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.EXCHANGE_APP2AI,
-                    RabbitMQConfig.RK_DRAFT_INBOUND,
+                    RabbitMQConfig.EXCHANGE_APP2RAG,
+                    RabbitMQConfig.RK_RAG_DRAFT_INBOUND,
                     message
             );
 
-            log.info("[OnboardingService] 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}",
-                    userId, category.getCategoryId(), category.getCategoryName());
+            log.info(
+                    "[OnboardingService] RAG 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}, jobId={}, requestId={}",
+                    userId,
+                    category.getCategoryId(),
+                    category.getCategoryName(),
+                    jobId,
+                    requestId
+            );
         }
 
         // 4. processing_count = category_ids 개수 반환
