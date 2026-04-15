@@ -7,7 +7,8 @@
 4. 최대한 구현은 인터페이스에 의존한다.
 5. RabbitMQ 파이프라인에 한해서 해당 spec은 가장 우선된다.
 6. 해당 md에 의해서 생성되는 코드는 메시지 파이프라인은 rabbitMQ 폴더, SSE 관련은 sse 폴더에 별도 관리되어야한다.
-7. 본 spec에서 Draft(Template) 리소스가 선언은 되어있지만 인지만 하고 실제 기능 생성에 관여하지 않는다. 별도 md로 추가 작성예정.
+7. 기존 `ai.draft`는 서비스 책임 분리가 되지 않은 초기안으로 간주한다.
+8. 초안/템플릿 생성은 현재 기준으로 RAG 책임이며, RabbitMQ 설계도 `rag.draft` 기준으로 다시 정의한다.
 
 ## 환경
 
@@ -30,6 +31,37 @@
 3. Outbox 테이블의 해당 emailId가 sending 으로 업데이트
 4. AI 서버로 비동기식으로 전달 후 AI 역시 반환 큐에 실어서 서비스 서버로 반환
 5. ack/nack 형식으로 RabbitMQ에서 DB로 저장 (Email_AI table) 및 Outbox status finished
+
+## RAG 파이프라인
+1. RAG는 지식 적재, 템플릿 생성, 템플릿 인덱싱, 템플릿 매칭을 담당한다.
+2. App Server는 작업 시작만 publish 하고, RAG Server는 progress/result를 반환한다.
+3. 사용자에게 보여줄 진행 상태는 RabbitMQ가 직접 관리하지 않고, App Server가 progress 메시지를 consume 하여 DB jobs 상태를 갱신한다.
+4. Frontend는 App Server의 SSE 또는 polling API를 통해 상태를 조회한다.
+
+### 지식 적재 파이프라인
+1. Backend가 FAQ / 업로드 PDF 정보를 수집한다.
+2. `q.2rag.knowledge.ingest` 로 적재 요청을 publish 한다.
+3. RAG worker가 PDF 파싱 -> chunking -> embedding -> Chroma 저장을 수행한다.
+4. 단계별 진행 상태는 `q.2app.rag.progress` 로 publish 한다.
+5. 완료/실패는 `q.2app.knowledge.ingest` 로 publish 한다.
+
+### 템플릿 생성 파이프라인
+1. Backend가 온보딩 입력값과 검색 문맥을 기반으로 `q.2rag.draft` 로 템플릿 생성 요청을 publish 한다.
+2. RAG worker가 retrieval + generation 을 수행한다.
+3. 단계별 진행 상태는 `q.2app.rag.progress` 로 publish 한다.
+4. 생성 완료 결과는 `q.2app.rag.draft` 로 publish 한다.
+5. Backend는 결과를 Template 테이블에 저장한 뒤 템플릿 인덱싱 작업을 다시 요청한다.
+
+### 템플릿 인덱싱 파이프라인
+1. Backend가 Template 저장 완료 후 `q.2rag.templates.index` 로 publish 한다.
+2. RAG worker가 canonical text 생성 -> embedding -> template collection 저장을 수행한다.
+3. 완료/실패는 `q.2app.templates.index` 로 publish 한다.
+
+### 템플릿 매칭 파이프라인
+1. 메일 수신 및 분석 완료 후 Backend가 `q.2rag.templates.match` 로 publish 한다.
+2. RAG worker가 이메일 canonicalization -> template similarity search 를 수행한다.
+3. 결과는 `q.2app.templates.match` 로 publish 한다.
+4. Backend는 추천 결과를 저장하고, 화면에는 저장된 결과만 조회로 전달한다.
 
 ## 설계원칙
 1. 중복 책임 방지 및 클래스별 책임 명확화
@@ -99,6 +131,14 @@ durable : true
 Type : direct
 durable : true
 
+#### x.app2rag.direct
+Type : direct
+durable : true
+
+#### x.rag2app.direct
+Type : direct
+durable : true
+
 #### x.retry.direct
 Type : direct
 durable : true
@@ -113,11 +153,8 @@ DLX : x.retry.direct
 x-dead-letter-routing-key: 2ai.classify.retry
 
 #### q.2ai.draft
-Publisher : APP Server
-Consumer : AI Server
-Binding Key : 2ai.draft
-DLX : x.retry.direct
-x-dead-letter-routing-key: 2ai.draft.retry
+[Deprecated]
+기존 초안 생성 큐. 현재 서비스 기준으로는 제거 대상이며 신규 구현에서는 사용하지 않는다.
 
 #### q.2app.classify
 Publisher : AI Server
@@ -127,11 +164,71 @@ DLX: x.retry.direct
 x-dead-letter-routing-key: 2app.classify.retry
 
 #### q.2app.draft
-Publisher : AI Server
+[Deprecated]
+기존 초안 생성 결과 큐. 현재 서비스 기준으로는 제거 대상이며 신규 구현에서는 사용하지 않는다.
+
+#### q.2rag.knowledge.ingest
+Publisher : APP Server
+Consumer : RAG Server
+Binding Key : 2rag.knowledge.ingest
+DLX : x.retry.direct
+x-dead-letter-routing-key: 2rag.knowledge.ingest.retry
+
+#### q.2app.knowledge.ingest
+Publisher : RAG Server
 Consumer : APP Server
-binding key: 2app.draft
+binding key: 2app.knowledge.ingest
 DLX: x.retry.direct
-x-dead-letter-routing-key: 2app.draft.retry
+x-dead-letter-routing-key: 2app.knowledge.ingest.retry
+
+#### q.2rag.draft
+Publisher : APP Server
+Consumer : RAG Server
+Binding Key : 2rag.draft
+DLX : x.retry.direct
+x-dead-letter-routing-key: 2rag.draft.retry
+
+#### q.2app.rag.draft
+Publisher : RAG Server
+Consumer : APP Server
+binding key: 2app.rag.draft
+DLX: x.retry.direct
+x-dead-letter-routing-key: 2app.rag.draft.retry
+
+#### q.2rag.templates.index
+Publisher : APP Server
+Consumer : RAG Server
+Binding Key : 2rag.templates.index
+DLX : x.retry.direct
+x-dead-letter-routing-key: 2rag.templates.index.retry
+
+#### q.2app.templates.index
+Publisher : RAG Server
+Consumer : APP Server
+binding key: 2app.templates.index
+DLX: x.retry.direct
+x-dead-letter-routing-key: 2app.templates.index.retry
+
+#### q.2rag.templates.match
+Publisher : APP Server
+Consumer : RAG Server
+Binding Key : 2rag.templates.match
+DLX : x.retry.direct
+x-dead-letter-routing-key: 2rag.templates.match.retry
+
+#### q.2app.templates.match
+Publisher : RAG Server
+Consumer : APP Server
+binding key: 2app.templates.match
+DLX: x.retry.direct
+x-dead-letter-routing-key: 2app.templates.match.retry
+
+#### q.2app.rag.progress
+Publisher : RAG Server
+Consumer : APP Server
+binding key: 2app.rag.progress
+DLX: x.retry.direct
+x-dead-letter-routing-key: 2app.rag.progress.retry
 
 
 #### q.2ai.classify.retry
@@ -142,11 +239,8 @@ x-dead-letter-routing-key: 2ai.classify
 binding key : 2ai.classify.retry
 
 #### q.2ai.draft.retry
-durable: true
-x-message-ttl: 30000
-x-dead-letter-exchange: x.app2ai.direct
-x-dead-letter-routing-key: 2ai.draft
-binding key: 2ai.draft.retry
+[Deprecated]
+신규 구현에서는 생성하지 않는다.
 
 #### q.2app.classify.retry
 durable: true
@@ -156,11 +250,71 @@ x-dead-letter-routing-key: 2app.classify
 binding key : 2app.classify.retry
 
 #### q.2app.draft.retry
+[Deprecated]
+신규 구현에서는 생성하지 않는다.
+
+#### q.2rag.knowledge.ingest.retry
 durable: true
 x-message-ttl: 30000
-x-dead-letter-exchange: x.ai2app.direct
-x-dead-letter-routing-key: 2app.draft
-binding key : 2app.draft.retry
+x-dead-letter-exchange: x.app2rag.direct
+x-dead-letter-routing-key: 2rag.knowledge.ingest
+binding key : 2rag.knowledge.ingest.retry
+
+#### q.2app.knowledge.ingest.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.rag2app.direct
+x-dead-letter-routing-key: 2app.knowledge.ingest
+binding key : 2app.knowledge.ingest.retry
+
+#### q.2rag.draft.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.app2rag.direct
+x-dead-letter-routing-key: 2rag.draft
+binding key : 2rag.draft.retry
+
+#### q.2app.rag.draft.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.rag2app.direct
+x-dead-letter-routing-key: 2app.rag.draft
+binding key : 2app.rag.draft.retry
+
+#### q.2rag.templates.index.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.app2rag.direct
+x-dead-letter-routing-key: 2rag.templates.index
+binding key : 2rag.templates.index.retry
+
+#### q.2app.templates.index.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.rag2app.direct
+x-dead-letter-routing-key: 2app.templates.index
+binding key : 2app.templates.index.retry
+
+#### q.2rag.templates.match.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.app2rag.direct
+x-dead-letter-routing-key: 2rag.templates.match
+binding key : 2rag.templates.match.retry
+
+#### q.2app.templates.match.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.rag2app.direct
+x-dead-letter-routing-key: 2app.templates.match
+binding key : 2app.templates.match.retry
+
+#### q.2app.rag.progress.retry
+durable: true
+x-message-ttl: 30000
+x-dead-letter-exchange: x.rag2app.direct
+x-dead-letter-routing-key: 2app.rag.progress
+binding key : 2app.rag.progress.retry
 
 
 
@@ -179,12 +333,70 @@ default exchange를 사용해서 queue 이름을 routing key로 직접 publish
 - RabbitAdmin Bean 등록을 통한 초기화 시점에 리소스 체크 로직
 - DLQ 안의 메시지 조회
 
+RAG 확장 시 추가할 상수명 기준:
+
+```java
+public static final String EXCHANGE_APP2RAG = "x.app2rag.direct";
+public static final String EXCHANGE_RAG2APP = "x.rag2app.direct";
+
+public static final String QUEUE_KNOWLEDGE_INGEST_INBOUND = "q.2rag.knowledge.ingest";
+public static final String QUEUE_KNOWLEDGE_INGEST_RESULT  = "q.2app.knowledge.ingest";
+
+public static final String QUEUE_RAG_DRAFT_INBOUND        = "q.2rag.draft";
+public static final String QUEUE_RAG_DRAFT_RESULT         = "q.2app.rag.draft";
+
+public static final String QUEUE_TEMPLATE_INDEX_INBOUND   = "q.2rag.templates.index";
+public static final String QUEUE_TEMPLATE_INDEX_RESULT    = "q.2app.templates.index";
+
+public static final String QUEUE_TEMPLATE_MATCH_INBOUND   = "q.2rag.templates.match";
+public static final String QUEUE_TEMPLATE_MATCH_RESULT    = "q.2app.templates.match";
+
+public static final String QUEUE_RAG_PROGRESS             = "q.2app.rag.progress";
+
+public static final String RK_KNOWLEDGE_INGEST_INBOUND = "2rag.knowledge.ingest";
+public static final String RK_KNOWLEDGE_INGEST_RESULT  = "2app.knowledge.ingest";
+
+public static final String RK_RAG_DRAFT_INBOUND        = "2rag.draft";
+public static final String RK_RAG_DRAFT_RESULT         = "2app.rag.draft";
+
+public static final String RK_TEMPLATE_INDEX_INBOUND   = "2rag.templates.index";
+public static final String RK_TEMPLATE_INDEX_RESULT    = "2app.templates.index";
+
+public static final String RK_TEMPLATE_MATCH_INBOUND   = "2rag.templates.match";
+public static final String RK_TEMPLATE_MATCH_RESULT    = "2app.templates.match";
+
+public static final String RK_RAG_PROGRESS            = "2app.rag.progress";
+```
+
 #### MailPublisher.java
 (스케쥴러에서 넘겨받아 서비스 서버 -> RabbitMQ로 메일을 보내는 역할)
 - RabbitTemplate final 로 호출 후 생성 convertandsend(json)
 - publish 인스턴스 생성 후 json 전환 후 x.app2ai.direct 로 실어 보냄
 - CorrelationData에 emailid 적재 + (메시지에 같이 CorrelationData 실음)
 - ConfirmCallback에서 ack=false(발송 실패)가 오면, MailService.markFailed(id)를 호출
+
+#### RagPublisher.java
+(서비스 서버 -> RabbitMQ로 RAG 작업을 보내는 역할)
+- `publishKnowledgeIngest()`
+- `publishDraftGeneration()`
+- `publishTemplateIndex()`
+- `publishTemplateMatch()`
+- 각 publish 는 `job_id`, `request_id`, `user_id` 를 CorrelationData 및 payload 에 함께 적재
+
+#### RagConsumer.java
+(RAG 서버로부터 RabbitMQ를 거쳐 온 결과를 관리하는 역할)
+- `q.2app.knowledge.ingest`
+- `q.2app.rag.draft`
+- `q.2app.templates.index`
+- `q.2app.templates.match`
+- 결과 수신 후 jobs 상태 및 대상 도메인 테이블 갱신
+
+#### RagProgressConsumer.java
+(RAG 진행 상태 이벤트를 consume 하는 역할)
+- `q.2app.rag.progress` 리스너 설정
+- `job_id` 기준으로 jobs 테이블 상태 갱신
+- `progress_step`, `progress_message`, `payload_json` 갱신
+- 커밋 후 SSE 브로드캐스트 또는 polling 조회 대상으로 노출
 
 #### MailConsumer.java
 (AI서버로 부터 RabbitMQ를 거쳐서 온 메일을 관리하고 SSE 파드에 방아쇠 역할)
@@ -242,6 +454,44 @@ DLQ 메시지 Get 조회 가능
 #### OutboxDTO.java
 - Outbox json으로 직렬화
 
+#### RagDraftGenerateRequestDTO.java
+- `job_id`
+- `request_id`
+- `user_id`
+- `mode` = `generate`
+- `category_id`
+- `category_name`
+- `industry_type`
+- `company_description`
+- `email_tone`
+- `rag_context`
+- `template_count`
+
+#### RagDraftGenerateResultDTO.java
+- `job_id`
+- `request_id`
+- `user_id`
+- `status`
+- `category_id`
+- `category_name`
+- `title`
+- `subject_template`
+- `body_template`
+- `metadata`
+
+#### RagProgressEventDTO.java
+- `job_id`
+- `request_id`
+- `user_id`
+- `job_type`
+- `target_type`
+- `target_id`
+- `status`
+- `progress_step`
+- `progress_message`
+- `payload`
+- `error`
+
 #### ClassifyResultEntity.java
 - Email_AI 테이블 매핑
 
@@ -286,4 +536,3 @@ DLQ 메시지 Get 조회 가능
 
 #### main.py
 - Docker 진입점 및 모델 -> RabbitMQ 연결 - 메시징 서버 순의 순차적 백그라운드 실행
-
