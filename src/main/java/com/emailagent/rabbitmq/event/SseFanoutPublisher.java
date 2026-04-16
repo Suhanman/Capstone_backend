@@ -30,7 +30,7 @@ public class SseFanoutPublisher {
     private final RabbitTemplate sseFanoutRabbitTemplate;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onSsePubSubEvent(SsePubSubEvent event) {
+    public void onSsePubSubEvent(SseEvent event) {
         // SSE Hub가 브라우저 연결을 식별·라우팅하기 위한 최소 payload
         Map<String, Object> payload = Map.of(
                 "user_id",  event.getUserId(),
