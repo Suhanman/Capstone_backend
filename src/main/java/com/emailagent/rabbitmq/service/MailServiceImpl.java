@@ -9,13 +9,11 @@ import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
-import com.emailagent.rabbitmq.event.SseNotifyEvent;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,9 +31,6 @@ import java.util.List;
  * SENDING → FINISH : markFinished() (AI 처리 성공)
  * SENDING → FAILED : markFailed() (재시도 3회 초과)
  *
- * [SSE 연동]
- * markFinished() 트랜잭션 커밋 후 SseNotifyEvent 발행 →
- * @TransactionalEventListener(AFTER_COMMIT)에서 SSE Pod 브로드캐스트 수행.
  */
 @Slf4j
 @Service
@@ -47,7 +42,6 @@ public class MailServiceImpl implements MailService {
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
     private final EmailAnalysisResultRepository analysisResultRepository;
-    private final ApplicationEventPublisher eventPublisher;
 
     // ===================================================
     // 상태 전이 메서드
@@ -138,9 +132,6 @@ public class MailServiceImpl implements MailService {
         analysisResultRepository.save(analysisResult);
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
-
-        // 트랜잭션 커밋 후 SSE 브로드캐스트 발화
-        eventPublisher.publishEvent(new SseNotifyEvent(this, emailId));
     }
 
     @Override

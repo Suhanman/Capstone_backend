@@ -48,9 +48,6 @@ app:
     server-url: ${AI_SERVER_URL}
     api-key: ${AI_API_KEY:}
 
-  sse:
-    pods: ${SSE_POD_0_URL},${SSE_POD_1_URL}
-
   google:
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
