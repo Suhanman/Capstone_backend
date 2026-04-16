@@ -5,7 +5,7 @@ import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.inbox.AttachmentMetaDto;
-import com.emailagent.rabbitmq.event.SsePubSubEvent;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.OutboxRepository;
@@ -126,7 +126,7 @@ public class PubSubHandlerService {
             // 1건 이상 저장된 경우 SSE Hub에 알림 (트랜잭션 커밋 후 x.sse.fanout publish)
             // 복수 메시지가 동시에 저장되어도 신호는 1회면 충분 (클라이언트가 목록 재조회)
             if (savedCount > 0) {
-                eventPublisher.publishEvent(new SsePubSubEvent(this, user.getUserId(), "pub/sub"));
+                eventPublisher.publishEvent(new SseEvent(this, user.getUserId(), "pub/sub"));
             }
 
             log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건, lastHistoryId={}",
