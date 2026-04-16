@@ -14,12 +14,15 @@ import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.EmailTemplateRecommendationRepository;
 import com.emailagent.repository.TemplateRepository;
+import com.emailagent.sse.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RAG 결과 메시지를 백엔드 도메인 모델에 반영하는 서비스.
@@ -35,6 +38,7 @@ public class RagResultService {
     private final EmailRepository emailRepository;
     private final EmailTemplateRecommendationRepository recommendationRepository;
     private final RagPublisher ragPublisher;
+    private final SseEmitterService sseEmitterService;
 
     @Transactional
     public void handleDraftGenerated(RagDraftGenerateResultDTO result) {
@@ -185,6 +189,7 @@ public class RagResultService {
                     userId,
                     emailId
             );
+            pushTemplateMatchUpdate(userId, emailId, 0);
             return;
         }
 
@@ -211,6 +216,8 @@ public class RagResultService {
                 emailId,
                 items.size()
         );
+
+        pushTemplateMatchUpdate(userId, emailId, items.size());
     }
 
     private Long parseEmailId(String rawEmailId) {
@@ -219,5 +226,13 @@ public class RagResultService {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("emailId는 숫자여야 합니다: " + rawEmailId, e);
         }
+    }
+
+    private void pushTemplateMatchUpdate(Long userId, Long emailId, int recommendationCount) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("email_id", emailId);
+        payload.put("recommendation_count", recommendationCount);
+
+        sseEmitterService.sendEventToUser(userId, "template-match-updated", payload);
     }
 }

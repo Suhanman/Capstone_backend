@@ -1,6 +1,8 @@
 package com.emailagent.sse.service;
 
+import com.emailagent.repository.EmailRepository;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -22,12 +24,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SseEmitterService {
 
     private static final long SSE_TIMEOUT_MS = 30 * 60 * 1000L; // 30분
 
     /** userId → SseEmitter 매핑 (ConcurrentHashMap: 다중 요청 안전) */
     private final Map<Long, SseEmitter> emitterMap = new ConcurrentHashMap<>();
+    private final EmailRepository emailRepository;
 
     /**
      * 신규 SseEmitter 생성 및 등록.
@@ -59,20 +63,12 @@ public class SseEmitterService {
      * @param emailId 완료된 이메일 ID (클라이언트에 전달)
      */
     public void notifyIfPresent(Long emailId) {
-        // emailId 기준으로 어떤 userId에게 보낼지는 실제 서비스에서 조회 필요.
-        // 현재는 단순 브로드캐스트: 모든 연결된 emitter에 알림.
-        emitterMap.forEach((userId, emitter) -> {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("classify-complete")
-                        .data(Map.of("email_id", emailId)));
-                log.debug("[SseEmitterService] SSE 전송 — userId={}, emailId={}", userId, emailId);
-            } catch (IOException e) {
-                log.warn("[SseEmitterService] 전송 실패, emitter 제거 — userId={}", userId);
-                emitterMap.remove(userId);
-                emitter.completeWithError(e);
-            }
-        });
+        Long userId = emailRepository.findUserIdByEmailId(emailId).orElse(null);
+        if (userId == null) {
+            return;
+        }
+
+        sendEventToUser(userId, "classify-complete", Map.of("email_id", emailId));
     }
 
     public void sendEventToUser(Long userId, String eventName, Object data) {
