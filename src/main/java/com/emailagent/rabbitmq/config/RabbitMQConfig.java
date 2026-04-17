@@ -36,6 +36,7 @@ public class RabbitMQConfig {
     public static final String QUEUE_DRAFT_INBOUND     = "q.2ai.draft";
     public static final String QUEUE_DRAFT_RESULT      = "q.2app.draft";
     public static final String QUEUE_DLX_FAILED        = "q.dlx.failed";
+    public static final String QUEUE_TRAINING_RESULT   = "q.2app.training";
 
     // ===================================================
     // Routing Key 상수
@@ -44,7 +45,6 @@ public class RabbitMQConfig {
     public static final String RK_CLASSIFY_RESULT  = "2app.classify";
     public static final String RK_DRAFT_INBOUND    = "2ai.draft";
     public static final String RK_DRAFT_RESULT     = "2app.draft";
-
     // ===================================================
     // JSON 메시지 컨버터
     // ===================================================

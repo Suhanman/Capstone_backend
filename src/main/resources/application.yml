@@ -60,6 +60,11 @@ app:
     frontend:
       base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
 
+  kubernetes:
+    namespace: ${K8S_NAMESPACE:default}
+    job-image: ${K8S_TRAINING_JOB_IMAGE}
+    ttl-seconds-after-finished: 300
+
   webhook:
     pubsub-verify-token: ${PUBSUB_VERIFY_TOKEN}
 
