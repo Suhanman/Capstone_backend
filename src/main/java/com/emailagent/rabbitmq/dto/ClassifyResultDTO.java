@@ -46,9 +46,9 @@ public class ClassifyResultDTO {
     @JsonProperty("schedule_detected")
     private boolean scheduleDetected;
 
-    /** 엔티티 추출 결과 (예: {"customer_name":"홍길동","company":"ABC"}) */
+    /** 엔티티 추출 결과 (예: {"date":"2026-04-23","time":"12:30","location":null}) */
     @JsonProperty("entities_json")
-    private String entitiesJson;
+    private Map<String, Object> entitiesJson;
 
     /** AI 모델 버전 */
     @JsonProperty("model_version")

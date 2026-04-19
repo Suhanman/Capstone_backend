@@ -10,8 +10,6 @@ import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.emailagent.repository.CalendarEventRepository;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
@@ -46,8 +44,6 @@ import java.util.Map;
 public class MailServiceImpl implements MailService {
 
     private static final int TIMEOUT_MINUTES = 30;
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
@@ -127,23 +123,20 @@ public class MailServiceImpl implements MailService {
                 .findByEmail_EmailId(emailId)
                 .orElseGet(() -> EmailAnalysisResult.builder().email(email).build());
 
-        // entities_json String → Map 파싱 (파싱 실패 시 null로 저장)
-        Map<String, Object> entitiesMap = parseEntitiesJson(result.getEntitiesJson());
-
         analysisResult.updateFromClassify(
                 result.getDomain(),
                 result.getIntent(),
                 result.getConfidenceScore(),
                 result.getSummaryText(),
                 result.isScheduleDetected(),
-                entitiesMap,
+                result.getEntitiesJson(),
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);
 
         // schedule_detected=true 이면 CalendarEvent(PENDING) 자동 생성
         if (result.isScheduleDetected()) {
-            createPendingCalendarEventIfAbsent(email, result.getSummaryText(), entitiesMap);
+            createPendingCalendarEventIfAbsent(email, result.getSummaryText(), result.getEntitiesJson());
         }
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
@@ -246,16 +239,6 @@ public class MailServiceImpl implements MailService {
      * - endDatetime: startDatetime + 1시간
      * - title: summary_text 사용
      */
-    private Map<String, Object> parseEntitiesJson(String json) {
-        if (json == null || json.isBlank()) return null;
-        try {
-            return OBJECT_MAPPER.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.warn("[MailService] entities_json 파싱 실패 — json={}, error={}", json, e.getMessage());
-            return null;
-        }
-    }
-
     private void createPendingCalendarEventIfAbsent(Email email, String summaryText, Map<String, Object> entities) {
         Long emailId = email.getEmailId();
         Long userId = email.getUser().getUserId();
