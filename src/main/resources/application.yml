@@ -63,10 +63,7 @@ app:
     job-image: ${K8S_TRAINING_JOB_IMAGE:placeholder}
     ttl-seconds-after-finished: 300
 
-  kubernetes:
-    namespace: ${K8S_NAMESPACE:default}
-    job-image: ${K8S_TRAINING_JOB_IMAGE}
-    ttl-seconds-after-finished: 300
+
 
   webhook:
     pubsub-verify-token: ${PUBSUB_VERIFY_TOKEN}
