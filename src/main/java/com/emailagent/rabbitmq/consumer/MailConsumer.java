@@ -54,12 +54,23 @@ public class MailConsumer {
             int retryCount = extractRetryCount(message);
 
             if (retryCount >= OutboxPolicy.MAX_RETRY) {
-                // 최대 재시도 초과 → FAILED 처리 후 원본 메시지를 q.dlx.failed에 수동 퍼블리시
-                // basicAck로 현재 큐에서 제거하고, RabbitTemplate으로 q.dlx.failed에 직접 전송
+                // 최대 재시도 초과 → FAILED 확정 후 q.dlx.failed로 이동
+                // FAILED 블록 내부 예외가 외부 catch로 탈출하면 basicNack → 재시도 무한반복이 되므로
+                // 독립 try-catch로 감싸서 예외 여부와 무관하게 반드시 basicAck 처리
                 log.error("[MailConsumer] 최대 재시도 초과 → FAILED — outboxId={}, retryCount={}", outboxId, retryCount);
-                mailService.markFailed(outboxId, "Max retry exceeded: " + retryCount);
-                rabbitTemplate.send(RabbitMQConfig.QUEUE_DLX_FAILED, message);
-                channel.basicAck(deliveryTag, false);
+                try {
+                    if (outboxId != null) {
+                        mailService.markFailed(outboxId, "Max retry exceeded: " + retryCount);
+                    } else {
+                        log.error("[MailConsumer] outboxId 없음(AI 서버 페이로드 미포함) — 메시지 폐기만 수행, retryCount={}", retryCount);
+                    }
+                    rabbitTemplate.send(RabbitMQConfig.QUEUE_DLX_FAILED, message);
+                } catch (Exception ex) {
+                    log.error("[MailConsumer] FAILED 처리 중 예외 — q.dlx.failed 전송 실패 가능성, outboxId={}, error={}", outboxId, ex.getMessage(), ex);
+                } finally {
+                    // 예외와 무관하게 반드시 ack → 재시도 루프 차단
+                    channel.basicAck(deliveryTag, false);
+                }
                 return;
             }
 
