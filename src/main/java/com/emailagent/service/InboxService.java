@@ -49,6 +49,7 @@ public class InboxService {
     private final MailPublisher mailPublisher;
     private final BusinessService businessService;
     private final GmailApiService gmailApiService;
+    private final GoogleCalendarApiService googleCalendarApiService;
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{(\\w+)\\}\\}");
 
@@ -264,26 +265,19 @@ public class InboxService {
 
         String message = switch (action) {
             case "ADD" -> {
-                // 캘린더 연동 여부 검증 — is_calendar_connected=false 이면 비즈니스 예외
-                integrationRepository.findByUser_UserId(userId)
-                        .filter(i -> i.isCalendarConnected())
-                        .orElseThrow(CalendarNotConnectedException::new);
+                // PENDING 상태의 CalendarEvent 조회 (AI가 markFinished()에서 생성한 것)
+                CalendarEvent event = calendarEventRepository
+                        .findByEmail_EmailIdAndUser_UserIdAndStatus(emailId, userId, "PENDING")
+                        .orElseThrow(() -> new ResourceNotFoundException("등록 대기 중인 일정을 찾을 수 없습니다."));
 
-                CalendarActionRequest.EventDetails details = request.getEventDetails();
-                if (details == null || details.getTitle() == null) {
-                    throw new IllegalArgumentException("ADD 액션은 event_details.title이 필요합니다.");
-                }
-                CalendarEvent event = CalendarEvent.builder()
-                        .user(user)
-                        .email(email)
-                        .title(details.getTitle())
-                        .startDatetime(details.getStartDatetime())
-                        .endDatetime(details.getEndDatetime())
-                        .source("EMAIL")
-                        .status("CONFIRMED")
-                        .isCalendarAdded(true)
-                        .build();
-                calendarEventRepository.save(event);
+                // CONFIRMED로 상태 변경
+                event.updateStatus("CONFIRMED");
+
+                // Google Calendar API 호출 (내부에서 is_calendar_connected 검증)
+                String googleEventId = googleCalendarApiService.createEvent(userId, event);
+                event.markAsCalendarAdded(googleEventId);
+
+                log.info("[InboxService] 일정 Google Calendar 등록 완료 — emailId={}, googleEventId={}", emailId, googleEventId);
                 yield "일정이 등록되었습니다.";
             }
             case "IGNORE" -> {

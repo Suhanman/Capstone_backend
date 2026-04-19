@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 /**
  * AI 서버의 분류(classify) 결과를 역직렬화하는 DTO.
@@ -12,7 +13,6 @@ import java.math.BigDecimal;
  *
  * [필드 기준]
  * EmailAnalysisResult.updateFromClassify() 시그니처 및 엔티티 필드 기준으로 정의.
- * email_embedding은 JSON 배열(List<Float>)로 수신 후 float[]로 변환한다.
  */
 @Getter
 @NoArgsConstructor
@@ -46,7 +46,7 @@ public class ClassifyResultDTO {
     @JsonProperty("schedule_detected")
     private boolean scheduleDetected;
 
-    /** 엔티티 추출 결과 - AI가 JSON 문자열로 전송하므로 String으로 수신 후 서비스 레이어에서 파싱 */
+    /** 엔티티 추출 결과 (예: {"customer_name":"홍길동","company":"ABC"}) */
     @JsonProperty("entities_json")
     private String entitiesJson;
 
