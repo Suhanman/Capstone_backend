@@ -59,8 +59,8 @@ app:
     email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email
 
   kubernetes:
-    namespace: ${K8S_NAMESPACE:default}
-    job-image: ${K8S_TRAINING_JOB_IMAGE}
+    namespace: ${K8S_NAMESPACE:job}
+    job-image: ${K8S_TRAINING_JOB_IMAGE:placeholder}
     ttl-seconds-after-finished: 300
 
   webhook:
