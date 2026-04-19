@@ -5,7 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -14,7 +13,6 @@ import java.util.Map;
  *
  * [필드 기준]
  * EmailAnalysisResult.updateFromClassify() 시그니처 및 엔티티 필드 기준으로 정의.
- * email_embedding은 JSON 배열(List<Float>)로 수신 후 float[]로 변환한다.
  */
 @Getter
 @NoArgsConstructor
@@ -47,13 +45,6 @@ public class ClassifyResultDTO {
     /** 일정 감지 여부 */
     @JsonProperty("schedule_detected")
     private boolean scheduleDetected;
-
-    /**
-     * 이메일 임베딩 벡터 (384차원).
-     * JSON 배열로 수신하며 MailServiceImpl에서 float[]로 변환하여 저장.
-     */
-    @JsonProperty("email_embedding")
-    private List<Float> emailEmbedding;
 
     /** 엔티티 추출 결과 (예: {"customer_name":"홍길동","company":"ABC"}) */
     @JsonProperty("entities_json")

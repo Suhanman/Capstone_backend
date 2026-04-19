@@ -1,5 +1,6 @@
 package com.emailagent.rabbitmq.service;
 
+import com.emailagent.domain.entity.CalendarEvent;
 import com.emailagent.domain.entity.Email;
 import com.emailagent.domain.entity.EmailAnalysisResult;
 import com.emailagent.domain.entity.Outbox;
@@ -10,6 +11,7 @@ import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
 import com.emailagent.rabbitmq.event.SseNotifyEvent;
+import com.emailagent.repository.CalendarEventRepository;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.OutboxRepository;
@@ -21,8 +23,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 /**
  * MailService 구현체.
@@ -47,6 +53,7 @@ public class MailServiceImpl implements MailService {
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
     private final EmailAnalysisResultRepository analysisResultRepository;
+    private final CalendarEventRepository calendarEventRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     // ===================================================
@@ -123,20 +130,21 @@ public class MailServiceImpl implements MailService {
                 .findByEmail_EmailId(emailId)
                 .orElseGet(() -> EmailAnalysisResult.builder().email(email).build());
 
-        // List<Float> → float[] 변환
-        float[] embedding = toFloatArray(result.getEmailEmbedding());
-
         analysisResult.updateFromClassify(
                 result.getDomain(),
                 result.getIntent(),
                 result.getConfidenceScore(),
                 result.getSummaryText(),
                 result.isScheduleDetected(),
-                embedding,
                 result.getEntitiesJson(),
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);
+
+        // schedule_detected=true 이면 CalendarEvent(PENDING) 자동 생성
+        if (result.isScheduleDetected()) {
+            createPendingCalendarEventIfAbsent(email, result);
+        }
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
 
@@ -230,12 +238,63 @@ public class MailServiceImpl implements MailService {
     // 내부 유틸
     // ===================================================
 
-    private float[] toFloatArray(List<Float> list) {
-        if (list == null || list.isEmpty()) return new float[0];
-        float[] arr = new float[list.size()];
-        for (int i = 0; i < list.size(); i++) {
-            arr[i] = list.get(i);
+    /**
+     * schedule_detected=true 일 때 CalendarEvent(PENDING)를 생성한다.
+     * 동일 email_id로 이미 CalendarEvent가 존재하면 중복 생성을 스킵한다.
+     *
+     * entities_json 파싱 규칙:
+     * - date(필수): 없으면 스킵
+     * - time(선택): 없으면 00:00 기본값
+     * - location(선택): null 허용
+     * - endDatetime: startDatetime + 1시간
+     * - title: summary_text 사용
+     */
+    private void createPendingCalendarEventIfAbsent(Email email, ClassifyResultDTO result) {
+        Long emailId = email.getEmailId();
+        Long userId = email.getUser().getUserId();
+
+        // 멱등성 보장: 이미 이 이메일에 연결된 CalendarEvent가 있으면 스킵
+        if (calendarEventRepository.findByEmail_EmailIdAndUser_UserId(emailId, userId).isPresent()) {
+            log.warn("[MailService] CalendarEvent 이미 존재, 생성 스킵 — emailId={}", emailId);
+            return;
         }
-        return arr;
+
+        Map<String, Object> entities = result.getEntitiesJson();
+        if (entities == null || entities.get("date") == null) {
+            log.warn("[MailService] entities_json.date 없음, CalendarEvent 생성 스킵 — emailId={}", emailId);
+            return;
+        }
+
+        try {
+            LocalDate date = LocalDate.parse((String) entities.get("date"), DateTimeFormatter.ISO_LOCAL_DATE);
+            Object timeVal = entities.get("time");
+            LocalTime time = (timeVal != null)
+                    ? LocalTime.parse((String) timeVal, DateTimeFormatter.ofPattern("H:mm"))
+                    : LocalTime.MIDNIGHT;
+
+            LocalDateTime startDatetime = LocalDateTime.of(date, time);
+            String location = entities.get("location") != null ? (String) entities.get("location") : null;
+
+            CalendarEvent event = CalendarEvent.builder()
+                    .user(email.getUser())
+                    .email(email)
+                    .title(result.getSummaryText())
+                    .startDatetime(startDatetime)
+                    .endDatetime(startDatetime.plusHours(1))
+                    .location(location)
+                    .source("EMAIL")
+                    .status("PENDING")
+                    .isCalendarAdded(false)
+                    .build();
+
+            calendarEventRepository.save(event);
+            log.info("[MailService] CalendarEvent(PENDING) 생성 완료 — emailId={}, startDatetime={}", emailId, startDatetime);
+
+        } catch (Exception e) {
+            // 파싱 실패 시 CalendarEvent 미생성으로 graceful 처리 (이메일 분석 결과는 정상 저장)
+            log.error("[MailService] CalendarEvent 생성 실패 (파싱 오류) — emailId={}, entities={}, error={}",
+                    emailId, entities, e.getMessage());
+        }
     }
+
 }

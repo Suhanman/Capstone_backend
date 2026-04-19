@@ -214,3 +214,48 @@ DB 수정사항 및 프론트 UI 스펙에 맞춰 캘린더 백엔드 확장
 ## 최종 결과
 - 완료: 2026-04-06
 - 빌드: BUILD SUCCESS
+
+---
+
+# AI 일정 감지 → Google Calendar 자동 등록 연동
+
+## 목표
+AI가 이메일에서 추출한 일정 정보를 PENDING으로 저장하고,
+사용자 승인 시 실제 Google Calendar에 등록하는 전체 흐름 완성
+
+## 전체 흐름
+```
+markFinished() [schedule_detected=true]
+  → CalendarEvent(PENDING) 생성 및 저장
+      ↓
+프론트 '일정 추가' 버튼 클릭
+  → POST /api/inbox/{email_id}/calendar { action: "ADD" }
+      ↓
+processCalendar(ADD)
+  → PENDING 이벤트 조회 → CONFIRMED 변경
+  → Google Calendar API 호출 → googleEventId 저장
+```
+
+## 체크리스트
+
+### Phase 1: MailServiceImpl — PENDING 일정 자동 생성 ✅
+- [x] `MailServiceImpl`에 `CalendarEventRepository` 의존성 추가
+- [x] `markFinished()` 내부에 `schedule_detected=true` 분기 추가
+- [x] `entities_json`에서 `date`, `time`, `location` 추출 및 LocalDateTime 파싱
+- [x] 중복 방지: `findByEmail_EmailIdAndUser_UserId` 존재 시 스킵
+- [x] `CalendarEvent(PENDING)` 빌더 생성 (title=summaryText, endDatetime=+1h)
+
+### Phase 2: InboxService.processCalendar(ADD) — Google Calendar 실제 등록 ✅
+- [x] `InboxService`에 `GoogleCalendarApiService` 의존성 추가
+- [x] ADD 분기: PENDING 이벤트 조회 → CONFIRMED 변경 → Google Calendar API 호출 → googleEventId 저장
+- [x] 기존 새 CalendarEvent 생성 코드 제거
+
+### Phase 3: GoogleCalendarApiService — Asia/Seoul 타임존 파싱 수정 ✅
+- [x] `ZoneOffset.UTC` → `ZoneId.of("Asia/Seoul")` 수정
+
+### Phase 4: 빌드 확인 ✅
+- [x] `mvn compile` 성공 (오류 없음)
+
+## 최종 결과
+- 완료: 2026-04-18
+- 빌드: BUILD SUCCESS

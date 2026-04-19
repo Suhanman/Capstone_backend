@@ -8,10 +8,8 @@ import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxListResponse;
 import com.emailagent.dto.response.inbox.RegenerateResponse;
-import com.emailagent.dto.response.recommend.RecommendedDraftResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.InboxService;
-import com.emailagent.service.RecommendService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -28,7 +26,6 @@ import java.nio.charset.StandardCharsets;
 public class InboxController {
 
     private final InboxService inboxService;
-    private final RecommendService recommendService;
 
     // GET /api/inbox?page=0&size=20&status=PENDING_REVIEW
     @GetMapping
@@ -55,15 +52,6 @@ public class InboxController {
             @PathVariable Long emailId,
             @RequestBody RegenerateRequest request) {
         return ResponseEntity.ok(inboxService.regenerate(userId, emailId, request));
-    }
-
-    // GET /api/inbox/{email_id}/recommendations?topK=3
-    @GetMapping("/{emailId}/recommendations")
-    public ResponseEntity<RecommendedDraftResponse> getRecommendations(
-            @CurrentUser Long userId,
-            @PathVariable Long emailId,
-            @RequestParam(defaultValue = "3") int topK) {
-        return ResponseEntity.ok(recommendService.recommendSimilarDrafts(emailId, topK));
     }
 
     // POST /api/inbox/{email_id}/reply
