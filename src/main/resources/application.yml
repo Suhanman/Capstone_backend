@@ -48,9 +48,6 @@ app:
     server-url: ${AI_SERVER_URL}
     api-key: ${AI_API_KEY:}
 
-  sse:
-    pods: ${SSE_POD_0_URL},${SSE_POD_1_URL}
-
   google:
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
@@ -59,6 +56,12 @@ app:
     topic-name: ${GOOGLE_TOPIC_NAME}
     frontend:
       base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+    email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email
+
+  kubernetes:
+    namespace: ${K8S_NAMESPACE:job}
+    job-image: ${K8S_TRAINING_JOB_IMAGE:placeholder}
+    ttl-seconds-after-finished: 300
 
   kubernetes:
     namespace: ${K8S_NAMESPACE:default}
@@ -73,6 +76,5 @@ server:
 
 logging:
   level:
-#    com.emailagent: DEBUG
-#    com.emailagent.rabbitmq: DEBUG
+    com.emailagent: DEBUG
     org.springframework.security: INFO

@@ -25,8 +25,9 @@ public class RabbitMQConfig {
     // ===================================================
     // Exchange 이름 상수 (Terraform 관리 값과 일치해야 함)
     // ===================================================
-    public static final String EXCHANGE_APP2AI = "x.app2ai.direct";
-    public static final String EXCHANGE_AI2APP = "x.ai2app.direct";
+    public static final String EXCHANGE_APP2AI    = "x.app2ai.direct";
+    public static final String EXCHANGE_AI2APP    = "x.ai2app.direct";
+    public static final String EXCHANGE_SSE_FANOUT = "x.sse.fanout";
 
     // ===================================================
     // Queue 이름 상수
@@ -91,6 +92,25 @@ public class RabbitMQConfig {
         // passive 선언 → Terraform이 미리 생성한 리소스가 없으면 기동 실패로 조기 감지
         admin.setAutoStartup(true);
         return admin;
+    }
+
+    // ===================================================
+    // SSE Fanout 전용 RabbitTemplate (mandatory=false)
+    // ===================================================
+    /**
+     * SSE Hub 알림 전용 RabbitTemplate.
+     *
+     * mandatory=false: fanout exchange에 큐가 바인딩되지 않은 경우(SSE Hub 미기동 등)
+     * ReturnsCallback이 발동되어 에러 로그가 찍히는 운영 노이즈를 방지한다.
+     * SSE 알림은 영속성 보장이 불필요하므로 ConfirmCallback도 등록하지 않는다.
+     */
+    @Bean
+    public RabbitTemplate sseFanoutRabbitTemplate(ConnectionFactory connectionFactory,
+                                                   Jackson2JsonMessageConverter jsonMessageConverter) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(jsonMessageConverter);
+        template.setMandatory(false);
+        return template;
     }
 
     // ===================================================

@@ -5,10 +5,12 @@ import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.inbox.AttachmentMetaDto;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.OutboxRepository;
 import com.emailagent.util.EmailParsingUtil;
+import org.springframework.context.ApplicationEventPublisher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -42,11 +44,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PubSubHandlerService {
 
-    private final IntegrationRepository   integrationRepository;
-    private final EmailRepository         emailRepository;
-    private final OutboxRepository        outboxRepository;
-    private final GoogleApiClientProvider   googleApiClientProvider;
-    private final ObjectMapper              objectMapper;
+    private final IntegrationRepository    integrationRepository;
+    private final EmailRepository          emailRepository;
+    private final OutboxRepository         outboxRepository;
+    private final GoogleApiClientProvider  googleApiClientProvider;
+    private final ObjectMapper             objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Pub/Sub Push 알림을 비동기로 처리한다.
@@ -74,15 +77,29 @@ public class PubSubHandlerService {
             // 2. Gmail 클라이언트 생성 (토큰 만료 시 RefreshToken으로 자동 갱신)
             Gmail gmailClient = googleApiClientProvider.buildGmailClient(integration);
 
-            // 3. historyId 이후 변경 이력 조회 — 신규 수신 메시지(messageAdded)만 필터링
+            // 3. startHistoryId 결정:
+            //    - lastHistoryId가 저장된 경우: 직전 처리 기준점 사용 (정상 경로)
+            //    - 최초 수신 또는 기준점 없는 경우: Pub/Sub historyId - 1 사용 (fallback)
+            //    Gmail API는 startHistoryId보다 큰 이력만 반환하므로,
+            //    Pub/Sub에서 받은 historyId 자체가 아닌 이전 기준점을 넘겨야 한다.
+            long startHistoryId;
+            if (integration.getLastHistoryId() != null) {
+                startHistoryId = integration.getLastHistoryId();
+            } else {
+                startHistoryId = historyId - 1;
+            }
+
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
-                    .setStartHistoryId(BigInteger.valueOf(historyId))
+                    .setStartHistoryId(BigInteger.valueOf(startHistoryId))
                     .setHistoryTypes(List.of("messageAdded"))
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
-                log.info("[PubSub] 신규 메시지 없음 — historyId={}, emailAddress={}", historyId, emailAddress);
+                log.debug("[PubSub] 신규 메시지 없음 — startHistoryId={}, pubsubHistoryId={}, emailAddress={}",
+                        startHistoryId, historyId, emailAddress);
+                // 메시지 없어도 기준점은 갱신 (다음 알림을 위해)
+                integration.updateLastHistoryId(historyId);
                 return;
             }
 
@@ -103,8 +120,17 @@ public class PubSubHandlerService {
                 if (saved) savedCount++;
             }
 
-            log.info("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건",
-                    emailAddress, savedCount, messageIds.size());
+            // 처리 완료 후 lastHistoryId 갱신 — 다음 Pub/Sub 알림의 startHistoryId 기준점
+            integration.updateLastHistoryId(historyId);
+
+            // 1건 이상 저장된 경우 SSE Hub에 알림 (트랜잭션 커밋 후 x.sse.fanout publish)
+            // 복수 메시지가 동시에 저장되어도 신호는 1회면 충분 (클라이언트가 목록 재조회)
+            if (savedCount > 0) {
+                eventPublisher.publishEvent(new SseEvent(this, user.getUserId(), "pub/sub"));
+            }
+
+            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건, lastHistoryId={}",
+                    emailAddress, savedCount, messageIds.size(), historyId);
 
         } catch (Exception e) {
             // @Async 스레드 내 예외는 전역 핸들러가 잡지 못하므로 여기서 반드시 기록
@@ -229,7 +255,7 @@ public class PubSubHandlerService {
                 .build();
         outboxRepository.save(outbox);
 
-        log.info("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
+        log.debug("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
                 messageId, subject, senderEmail, attachmentParts.size());
         return true;
     }
