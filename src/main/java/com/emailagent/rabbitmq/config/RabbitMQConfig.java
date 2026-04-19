@@ -51,7 +51,11 @@ public class RabbitMQConfig {
     // ===================================================
     @Bean
     public Jackson2JsonMessageConverter jsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+        // AI 서버(Python)는 Spring의 __TypeId__ 헤더를 포함하지 않으므로,
+        // 헤더 대신 @RabbitListener 메서드 파라미터 타입으로 역직렬화 대상을 추론하도록 설정.
+        converter.setAlwaysConvertToInferredType(true);
+        return converter;
     }
 
     // ===================================================
