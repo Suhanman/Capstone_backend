@@ -136,7 +136,7 @@ public class MailServiceImpl implements MailService {
 
         // schedule_detected=true 이면 CalendarEvent(PENDING) 자동 생성
         if (result.isScheduleDetected()) {
-            createPendingCalendarEventIfAbsent(email, result.getSummaryText(), result.getEntitiesJson());
+            createPendingCalendarEventIfAbsent(email, result.getEntitiesJson());
         }
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
@@ -237,9 +237,9 @@ public class MailServiceImpl implements MailService {
      * - time(선택): 없으면 00:00 기본값
      * - location(선택): null 허용
      * - endDatetime: startDatetime + 1시간
-     * - title: summary_text 사용
+     * - title: "[발신자명] 메일제목" 형태로 원본 이메일에서 조합
      */
-    private void createPendingCalendarEventIfAbsent(Email email, String summaryText, Map<String, Object> entities) {
+    private void createPendingCalendarEventIfAbsent(Email email, Map<String, Object> entities) {
         Long emailId = email.getEmailId();
         Long userId = email.getUser().getUserId();
 
@@ -264,10 +264,16 @@ public class MailServiceImpl implements MailService {
             LocalDateTime startDatetime = LocalDateTime.of(date, time);
             String location = entities.get("location") != null ? (String) entities.get("location") : null;
 
+            // 제목: "[발신자명] 메일제목" 형태로 조합 (발신자명 없으면 메일제목만 사용)
+            String senderName = email.getSenderName();
+            String title = (senderName != null && !senderName.isBlank())
+                    ? "[" + senderName + "] " + email.getSubject()
+                    : email.getSubject();
+
             CalendarEvent event = CalendarEvent.builder()
                     .user(email.getUser())
                     .email(email)
-                    .title(summaryText)
+                    .title(title)
                     .startDatetime(startDatetime)
                     .endDatetime(startDatetime.plusHours(1))
                     .location(location)
@@ -277,7 +283,7 @@ public class MailServiceImpl implements MailService {
                     .build();
 
             calendarEventRepository.save(event);
-            log.info("[MailService] CalendarEvent(PENDING) 생성 완료 — emailId={}, startDatetime={}", emailId, startDatetime);
+            log.info("[MailService] CalendarEvent(PENDING) 생성 완료 — emailId={}, title={}, startDatetime={}", emailId, title, startDatetime);
 
         } catch (Exception e) {
             // 파싱 실패 시 CalendarEvent 미생성으로 graceful 처리 (이메일 분석 결과는 정상 저장)
