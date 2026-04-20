@@ -27,6 +27,7 @@ public class CalendarEventResponse {
     private String eventType;
 
     private String location;
+    private String notes;
 
     private String source;
     private String status;
@@ -34,8 +35,20 @@ public class CalendarEventResponse {
     @JsonProperty("is_calendar_added")
     private boolean isCalendarAdded;
 
+    @JsonProperty("email_id")
+    private Long emailId;
+
+    @JsonProperty("email_sender_name")
+    private String emailSenderName;
+
+    @JsonProperty("email_subject")
+    private String emailSubject;
+
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("updated_at")
+    private LocalDateTime updatedAt;
 
     public static CalendarEventResponse from(CalendarEvent event) {
         return CalendarEventResponse.builder()
@@ -45,10 +58,15 @@ public class CalendarEventResponse {
                 .endDatetime(event.getEndDatetime())
                 .eventType(event.getEventType())
                 .location(event.getLocation())
+                .notes(event.getDescription())
                 .source(event.getSource())
                 .status(event.getStatus())
                 .isCalendarAdded(event.isCalendarAdded())
+                .emailId(event.getEmail() != null ? event.getEmail().getEmailId() : null)
+                .emailSenderName(event.getEmail() != null ? event.getEmail().getSenderName() : null)
+                .emailSubject(event.getEmail() != null ? event.getEmail().getSubject() : null)
                 .createdAt(event.getCreatedAt())
+                .updatedAt(event.getUpdatedAt())
                 .build();
     }
 }
