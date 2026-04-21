@@ -50,7 +50,12 @@ public class AdminAutomationService {
                 .map(rule -> new AdminAutomationRuleListResponse.RuleItem(
                         rule.getRuleId(),
                         rule.getUser().getUserId(),
-                        rule.isActive()
+                        rule.isActive(),
+                        rule.getName(),
+                        rule.getCategory() != null ? rule.getCategory().getCategoryName() : null,
+                        rule.getTriggerCondition(),
+                        rule.getActionDescription(),
+                        rule.getUpdatedAt()
                 ))
                 .collect(Collectors.toList());
 
@@ -74,7 +79,12 @@ public class AdminAutomationService {
                 templateId,
                 rule.isAutoSendEnabled(),
                 rule.isAutoCalendarEnabled(),
-                rule.isActive()
+                rule.isActive(),
+                rule.getName(),
+                rule.getCategory().getCategoryName(),
+                rule.getTriggerCondition(),
+                rule.getActionDescription(),
+                rule.getUpdatedAt()
         );
     }
 
@@ -101,6 +111,9 @@ public class AdminAutomationService {
                 .template(template)
                 .autoSendEnabled(request.getAutoSendEnabled())
                 .autoCalendarEnabled(request.getAutoCalendarEnabled())
+                .name(request.getName())
+                .triggerCondition(request.getTriggerCondition())
+                .actionDescription(request.getActionDescription())
                 .build();
 
         AutomationRule saved = automationRuleRepository.save(rule);
@@ -124,6 +137,7 @@ public class AdminAutomationService {
         }
 
         rule.updateByAdmin(template, request.getIsActive(), request.getAutoSendEnabled());
+        rule.updateDetails(request.getName(), request.getTriggerCondition(), request.getActionDescription());
 
         return new AdminAutomationRuleUpdateResponse(rule.getRuleId());
     }
