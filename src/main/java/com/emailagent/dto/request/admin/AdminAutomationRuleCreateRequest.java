@@ -27,4 +27,13 @@ public class AdminAutomationRuleCreateRequest {
     @NotNull
     @JsonProperty("auto_calendar_enabled")
     private Boolean autoCalendarEnabled;
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("trigger_condition")
+    private String triggerCondition;
+
+    @JsonProperty("action_description")
+    private String actionDescription;
 }

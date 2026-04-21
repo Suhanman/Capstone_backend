@@ -4,6 +4,7 @@ import com.emailagent.dto.response.auth.BaseResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -33,11 +34,34 @@ public class AdminTemplateListResponse extends BaseResponse {
         @JsonProperty("created_at")
         private final String createdAt;
 
-        public TemplateItem(long templateId, long userId, String title, String createdAt) {
+        private final String category;
+
+        private final String industry;
+
+        @JsonProperty("use_count")
+        private final Integer useCount;
+
+        @JsonProperty("user_count")
+        private final Integer userCount;
+
+        @JsonProperty("generated_at")
+        private final LocalDateTime generatedAt;
+
+        private final String quality;
+
+        public TemplateItem(long templateId, long userId, String title, String createdAt,
+                            String category, String industry, Integer useCount, Integer userCount,
+                            LocalDateTime generatedAt, String quality) {
             this.templateId = templateId;
             this.userId = userId;
             this.title = title;
             this.createdAt = createdAt;
+            this.category = category;
+            this.industry = industry;
+            this.useCount = useCount;
+            this.userCount = userCount;
+            this.generatedAt = generatedAt;
+            this.quality = quality;
         }
     }
 }

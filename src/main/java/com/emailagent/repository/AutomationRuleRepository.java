@@ -47,4 +47,8 @@ public interface AutomationRuleRepository extends JpaRepository<AutomationRule, 
             WHERE ar.ruleId = :ruleId
             """)
     Optional<AutomationRule> findDetailByRuleId(@Param("ruleId") Long ruleId);
+
+    long countByIsActiveTrue();
+
+    long countByAutoSendEnabledTrue();
 }
