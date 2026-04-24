@@ -34,6 +34,15 @@ public class AutomationRule {
     @JoinColumn(name = "template_id")
     private Template template;
 
+    @Column(name = "name", length = 255)
+    private String name;
+
+    @Column(name = "trigger_condition", columnDefinition = "TEXT")
+    private String triggerCondition;
+
+    @Column(name = "action_description", length = 500)
+    private String actionDescription;
+
     @Column(name = "auto_send_enabled", nullable = false)
     @Builder.Default
     private boolean autoSendEnabled = false;
@@ -60,6 +69,12 @@ public class AutomationRule {
         this.category = category;
         this.template = template;
         this.autoSendEnabled = autoSendEnabled;
+    }
+
+    public void updateDetails(String name, String triggerCondition, String actionDescription) {
+        if (name != null) this.name = name;
+        if (triggerCondition != null) this.triggerCondition = triggerCondition;
+        if (actionDescription != null) this.actionDescription = actionDescription;
     }
 
     public void toggleAutoSend(boolean enabled) {

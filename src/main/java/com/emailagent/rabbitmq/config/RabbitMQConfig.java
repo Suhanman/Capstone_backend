@@ -29,6 +29,7 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_AI2APP = "x.ai2app.direct";
     public static final String EXCHANGE_APP2RAG = "x.app2rag.direct";
     public static final String EXCHANGE_RAG2APP = "x.rag2app.direct";
+    public static final String EXCHANGE_SSE_FANOUT = "x.sse.fanout";
 
     // ===================================================
     // Queue 이름 상수
@@ -45,6 +46,7 @@ public class RabbitMQConfig {
     public static final String QUEUE_TEMPLATE_MATCH_RESULT  = "q.2app.templates.match";
     public static final String QUEUE_RAG_PROGRESS      = "q.2app.rag.progress";
     public static final String QUEUE_DLX_FAILED        = "q.dlx.failed";
+    public static final String QUEUE_TRAINING_RESULT   = "q.2app.training";
 
     // ===================================================
     // Routing Key 상수
@@ -60,13 +62,19 @@ public class RabbitMQConfig {
     public static final String RK_TEMPLATE_MATCH_INBOUND = "2rag.templates.match";
     public static final String RK_TEMPLATE_MATCH_RESULT  = "2app.templates.match";
     public static final String RK_RAG_PROGRESS      = "2app.rag.progress";
+    public static final String RK_DRAFT_INBOUND    = "2ai.draft";
+    public static final String RK_DRAFT_RESULT     = "2app.draft";
 
     // ===================================================
     // JSON 메시지 컨버터
     // ===================================================
     @Bean
     public Jackson2JsonMessageConverter jsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+        // AI 서버(Python)는 Spring의 __TypeId__ 헤더를 포함하지 않으므로,
+        // 헤더 대신 @RabbitListener 메서드 파라미터 타입으로 역직렬화 대상을 추론하도록 설정.
+        converter.setAlwaysConvertToInferredType(true);
+        return converter;
     }
 
     // ===================================================
@@ -107,6 +115,25 @@ public class RabbitMQConfig {
         // passive 선언 → Terraform이 미리 생성한 리소스가 없으면 기동 실패로 조기 감지
         admin.setAutoStartup(true);
         return admin;
+    }
+
+    // ===================================================
+    // SSE Fanout 전용 RabbitTemplate (mandatory=false)
+    // ===================================================
+    /**
+     * SSE Hub 알림 전용 RabbitTemplate.
+     *
+     * mandatory=false: fanout exchange에 큐가 바인딩되지 않은 경우(SSE Hub 미기동 등)
+     * ReturnsCallback이 발동되어 에러 로그가 찍히는 운영 노이즈를 방지한다.
+     * SSE 알림은 영속성 보장이 불필요하므로 ConfirmCallback도 등록하지 않는다.
+     */
+    @Bean
+    public RabbitTemplate sseFanoutRabbitTemplate(ConnectionFactory connectionFactory,
+                                                   Jackson2JsonMessageConverter jsonMessageConverter) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(jsonMessageConverter);
+        template.setMandatory(false);
+        return template;
     }
 
     // ===================================================

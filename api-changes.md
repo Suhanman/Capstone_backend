@@ -586,3 +586,42 @@ ALTER TABLE Users ADD COLUMN onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE
 |-----|---------------|
 | `POST /api/templates` | `categoryId`, `subjectTemplate`, `bodyTemplate` |
 | `POST /api/calendar/events` | `startDatetime`, `endDatetime` |
+
+---
+
+## [2026-04-21] 템플릿/자동화 관리 페이지 API 추가
+
+### DB 변경
+```sql
+-- automation_rules 테이블 컬럼 추가
+ALTER TABLE automation_rules
+ADD COLUMN name VARCHAR(255) NULL,
+ADD COLUMN trigger_condition TEXT NULL,
+ADD COLUMN action_description VARCHAR(500) NULL;
+
+-- templates 테이블 컬럼 추가
+ALTER TABLE templates
+ADD COLUMN use_count INT DEFAULT 0,
+ADD COLUMN user_count INT DEFAULT 0;
+```
+
+-- industry는 BusinessProfiles.industry_type JOIN으로 조회 (컬럼 추가 없음)
+-- quality는 별도 컬럼 없이 accuracy_score 기반 계산
+-- 0.8 이상 → 높음, 0.5~0.8 → 보통, 0.5 미만 → 낮음
+
+### API 변경사항
+- GET /api/admin/automations/rules
+  응답에 name, trigger, action, category(이름), status("활성"/"비활성"), updated_at 필드 추가
+- GET /api/admin/automations/rules/{rule_id}
+  응답에 동일 필드 추가
+- POST /api/admin/automations/rules
+  요청에 name, trigger_condition, action_description 필드 추가
+- PATCH /api/admin/automations/rules/{rule_id}
+  요청에 name, trigger_condition, action_description 필드 추가
+- GET /api/admin/templates
+  응답에 category(이름), industry(BusinessProfiles.industry_type),
+  use_count, user_count, generated_at, quality 필드 추가
+  quality = accuracy_score 기반 계산 (0.8이상=높음, 0.5~0.8=보통, 0.5미만=낮음)
+- GET /api/admin/templates/summary 신규 추가
+  응답: { total_templates, top_category, top_category_usage_count,
+          active_rule_count, auto_send_rule_count }

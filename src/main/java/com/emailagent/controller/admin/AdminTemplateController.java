@@ -2,6 +2,7 @@ package com.emailagent.controller.admin;
 
 import com.emailagent.dto.response.admin.template.AdminTemplateCategoryStatResponse;
 import com.emailagent.dto.response.admin.template.AdminTemplateListResponse;
+import com.emailagent.dto.response.admin.template.AdminTemplateSummaryResponse;
 import com.emailagent.service.admin.AdminTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +23,11 @@ public class AdminTemplateController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return adminTemplateService.getTemplates(userId, page, size);
+    }
+
+    @GetMapping("/summary")
+    public AdminTemplateSummaryResponse getSummary() {
+        return adminTemplateService.getSummary();
     }
 
     @GetMapping("/statistics/by-category")

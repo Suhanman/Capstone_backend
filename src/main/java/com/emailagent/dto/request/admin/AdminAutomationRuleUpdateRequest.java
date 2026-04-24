@@ -17,4 +17,13 @@ public class AdminAutomationRuleUpdateRequest {
 
     @JsonProperty("auto_send_enabled")
     private Boolean autoSendEnabled;
+
+    @JsonProperty("name")
+    private String name;
+
+    @JsonProperty("trigger_condition")
+    private String triggerCondition;
+
+    @JsonProperty("action_description")
+    private String actionDescription;
 }

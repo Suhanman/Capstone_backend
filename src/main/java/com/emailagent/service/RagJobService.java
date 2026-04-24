@@ -13,13 +13,14 @@ import com.emailagent.rabbitmq.dto.RagProgressEventDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchResultDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateIndexResultDTO;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.RagJobRepository;
 import com.emailagent.repository.UserRepository;
-import com.emailagent.sse.service.SseEmitterService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -37,7 +38,7 @@ public class RagJobService {
     private final RagJobRepository ragJobRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
-    private final SseEmitterService sseEmitterService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void createKnowledgeIngestJob(RagKnowledgeIngestRequestDTO request) {
@@ -265,10 +266,11 @@ public class RagJobService {
         payload.put("error_message", job.getErrorMessage());
         payload.put("completed_at", job.getCompletedAt());
 
-        sseEmitterService.sendEventToUser(
+        eventPublisher.publishEvent(new SseEvent(
+                this,
                 job.getUser().getUserId(),
                 "rag-job-updated",
                 payload
-        );
+        ));
     }
 }

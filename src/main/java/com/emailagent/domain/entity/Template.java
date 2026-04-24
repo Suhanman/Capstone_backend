@@ -44,6 +44,14 @@ public class Template {
     @Column(name = "accuracy_score", precision = 5, scale = 2)
     private BigDecimal accuracyScore;
 
+    @Column(name = "use_count")
+    @Builder.Default
+    private Integer useCount = 0;
+
+    @Column(name = "user_count")
+    @Builder.Default
+    private Integer userCount = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -61,5 +69,12 @@ public class Template {
 
     public void updateAccuracyScore(BigDecimal score) {
         this.accuracyScore = score;
+    }
+
+    public String getQuality() {
+        if (accuracyScore == null) return "보통";
+        if (accuracyScore.compareTo(new BigDecimal("0.8")) >= 0) return "높음";
+        if (accuracyScore.compareTo(new BigDecimal("0.5")) >= 0) return "보통";
+        return "낮음";
     }
 }

@@ -23,13 +23,13 @@ public interface TemplateRepository extends JpaRepository<Template, Long> {
 
     Optional<Template> findByUser_UserIdAndCategory_CategoryIdAndVariantLabel(Long userId, Long categoryId, String variantLabel);
 
-    // 관리자 - 전체 템플릿 페이징 (user FETCH JOIN으로 N+1 방지)
-    @Query(value = "SELECT t FROM Template t JOIN FETCH t.user ORDER BY t.createdAt DESC",
+    // 관리자 - 전체 템플릿 페이징 (user, category FETCH JOIN으로 N+1 방지)
+    @Query(value = "SELECT t FROM Template t JOIN FETCH t.user JOIN FETCH t.category ORDER BY t.createdAt DESC",
            countQuery = "SELECT COUNT(t) FROM Template t")
     Page<Template> findAllWithUserOrderByCreatedAtDesc(Pageable pageable);
 
-    // 관리자 - 특정 사용자 템플릿 페이징 (user FETCH JOIN)
-    @Query(value = "SELECT t FROM Template t JOIN FETCH t.user WHERE t.user.userId = :userId ORDER BY t.createdAt DESC",
+    // 관리자 - 특정 사용자 템플릿 페이징 (user, category FETCH JOIN)
+    @Query(value = "SELECT t FROM Template t JOIN FETCH t.user JOIN FETCH t.category WHERE t.user.userId = :userId ORDER BY t.createdAt DESC",
            countQuery = "SELECT COUNT(t) FROM Template t WHERE t.user.userId = :userId")
     Page<Template> findByUserIdWithUserOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
 

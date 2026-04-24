@@ -80,10 +80,6 @@ public class EmailAnalysisResult {
         this.scheduleDetected = scheduleDetected;
     }
 
-    /**
-     * classify 큐 AI 결과 수신 후 업데이트.
-     * emailEmbedding은 RAG 서버가 직접 저장하므로 백엔드에서 처리하지 않는다.
-     */
     public void updateFromClassify(String domain, String intent, BigDecimal confidenceScore,
                                    String summaryText, boolean scheduleDetected,
                                    Map<String, Object> entitiesJson, String modelVersion) {

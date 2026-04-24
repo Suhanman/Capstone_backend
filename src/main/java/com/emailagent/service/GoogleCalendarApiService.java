@@ -14,7 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 
 /**
  * Google Calendar 공식 Java 클라이언트를 사용해 실제 캘린더 이벤트 CRUD를 담당하는 서비스.
@@ -134,15 +134,18 @@ public class GoogleCalendarApiService {
      * - end가 null인 경우 start + 1시간으로 기본값 처리
      */
     private Event toGoogleEvent(CalendarEvent event) {
+        // DB에 저장된 LocalDateTime은 Asia/Seoul 기준값이므로 ZoneId로 감싸서 정확한 UTC Instant로 변환
+        ZoneId seoulZone = ZoneId.of("Asia/Seoul");
+
         DateTime startDt = new DateTime(
-                event.getStartDatetime().toInstant(ZoneOffset.UTC).toEpochMilli());
+                event.getStartDatetime().atZone(seoulZone).toInstant().toEpochMilli());
 
         // endDatetime이 없으면 시작 시각 + 1시간으로 기본 처리
         DateTime endDt = new DateTime(
                 (event.getEndDatetime() != null
                         ? event.getEndDatetime()
                         : event.getStartDatetime().plusHours(1))
-                        .toInstant(ZoneOffset.UTC).toEpochMilli());
+                        .atZone(seoulZone).toInstant().toEpochMilli());
 
         EventDateTime start = new EventDateTime().setDateTime(startDt).setTimeZone("Asia/Seoul");
         EventDateTime end   = new EventDateTime().setDateTime(endDt).setTimeZone("Asia/Seoul");

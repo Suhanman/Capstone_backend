@@ -8,15 +8,16 @@ import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.rabbitmq.dto.RagDraftGenerateResultDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchResultDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateIndexRequestDTO;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
 import com.emailagent.repository.BusinessProfileRepository;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.EmailTemplateRecommendationRepository;
 import com.emailagent.repository.TemplateRepository;
-import com.emailagent.sse.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +39,7 @@ public class RagResultService {
     private final EmailRepository emailRepository;
     private final EmailTemplateRecommendationRepository recommendationRepository;
     private final RagPublisher ragPublisher;
-    private final SseEmitterService sseEmitterService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void handleDraftGenerated(RagDraftGenerateResultDTO result) {
@@ -233,6 +234,6 @@ public class RagResultService {
         payload.put("email_id", emailId);
         payload.put("recommendation_count", recommendationCount);
 
-        sseEmitterService.sendEventToUser(userId, "template-match-updated", payload);
+        eventPublisher.publishEvent(new SseEvent(this, userId, "template-match-updated", payload));
     }
 }

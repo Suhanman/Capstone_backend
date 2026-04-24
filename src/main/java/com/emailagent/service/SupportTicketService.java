@@ -6,10 +6,11 @@ import com.emailagent.dto.request.support.SupportTicketRequest;
 import com.emailagent.dto.response.support.SupportTicketDetailResponse;
 import com.emailagent.dto.response.support.SupportTicketListResponse;
 import com.emailagent.exception.ResourceNotFoundException;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.SupportTicketRepository;
 import com.emailagent.repository.UserRepository;
-import com.emailagent.sse.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ public class SupportTicketService {
 
     private final SupportTicketRepository supportTicketRepository;
     private final UserRepository userRepository;
-    private final SseEmitterService sseEmitterService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // =============================================
     // GET /api/support-tickets?status=
@@ -81,7 +82,7 @@ public class SupportTicketService {
                 saved.getCreatedAt() != null ? saved.getCreatedAt().toInstant(ZoneOffset.UTC).toString() : null
         );
 
-        sseEmitterService.sendEventToUser(userId, "support-ticket-updated", payload);
+        eventPublisher.publishEvent(new SseEvent(this, userId, "support-ticket-updated", payload));
 
         return SupportTicketDetailResponse.CreateResponse.builder()
                 .ticketId(saved.getTicketId())

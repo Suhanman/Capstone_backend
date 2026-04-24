@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 /**
  * AI 서버의 분류(classify) 결과를 역직렬화하는 DTO.
@@ -45,9 +46,9 @@ public class ClassifyResultDTO {
     @JsonProperty("schedule_detected")
     private boolean scheduleDetected;
 
-    /** 엔티티 추출 결과 - AI가 JSON 문자열로 전송하므로 String으로 수신 후 서비스 레이어에서 파싱 */
+    /** 엔티티 추출 결과 (예: {"date":"2026-04-23","time":"12:30","location":null}) */
     @JsonProperty("entities_json")
-    private String entitiesJson;
+    private Map<String, Object> entitiesJson;
 
     /** AI 모델 버전 */
     @JsonProperty("model_version")

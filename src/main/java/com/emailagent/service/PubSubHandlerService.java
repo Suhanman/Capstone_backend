@@ -5,10 +5,12 @@ import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
 import com.emailagent.dto.inbox.AttachmentMetaDto;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.IntegrationRepository;
 import com.emailagent.repository.OutboxRepository;
 import com.emailagent.util.EmailParsingUtil;
+import org.springframework.context.ApplicationEventPublisher;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -42,11 +44,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PubSubHandlerService {
 
-    private final IntegrationRepository   integrationRepository;
-    private final EmailRepository         emailRepository;
-    private final OutboxRepository        outboxRepository;
-    private final GoogleApiClientProvider   googleApiClientProvider;
-    private final ObjectMapper              objectMapper;
+    private final IntegrationRepository    integrationRepository;
+    private final EmailRepository          emailRepository;
+    private final OutboxRepository         outboxRepository;
+    private final GoogleApiClientProvider  googleApiClientProvider;
+    private final ObjectMapper             objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Pub/Sub Push 알림을 비동기로 처리한다.
@@ -119,6 +122,12 @@ public class PubSubHandlerService {
 
             // 처리 완료 후 lastHistoryId 갱신 — 다음 Pub/Sub 알림의 startHistoryId 기준점
             integration.updateLastHistoryId(historyId);
+
+            // 1건 이상 저장된 경우 SSE Hub에 알림 (트랜잭션 커밋 후 x.sse.fanout publish)
+            // 복수 메시지가 동시에 저장되어도 신호는 1회면 충분 (클라이언트가 목록 재조회)
+            if (savedCount > 0) {
+                eventPublisher.publishEvent(new SseEvent(this, user.getUserId(), "pub/sub"));
+            }
 
             log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건, lastHistoryId={}",
                     emailAddress, savedCount, messageIds.size(), historyId);
