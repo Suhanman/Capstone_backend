@@ -13,7 +13,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * App Server -> RAG RabbitMQ 발행 컴포넌트.
+ * 앱 서버에서 RAG로 RabbitMQ 메시지를 발행하는 컴포넌트.
  *
  * 현재는 온보딩 기준으로 knowledge ingest 와 draft generation 발행을 담당한다.
  * 이후 templates.index / templates.match 도 같은 패턴으로 확장한다.

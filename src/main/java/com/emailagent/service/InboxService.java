@@ -387,7 +387,7 @@ public class InboxService {
     }
 
     // =============================================
-    // private helpers
+    // 내부 헬퍼 메서드
     // =============================================
 
     private Email findEmailForUser(Long emailId, Long userId) {

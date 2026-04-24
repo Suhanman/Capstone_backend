@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Backend domain services should depend on this facade instead of RabbitMQ DTOs directly.
- * That keeps future RAG contract changes inside the RAG integration boundary.
+ * 백엔드 도메인 서비스가 RabbitMQ DTO에 직접 의존하지 않도록 감싸는 RAG 연동 파사드.
+ * 이후 RAG 계약이 바뀌더라도 변경 범위를 이 연동 경계 안으로 제한한다.
  */
 @Slf4j
 @Service
