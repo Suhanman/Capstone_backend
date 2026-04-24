@@ -5,11 +5,9 @@ import com.emailagent.dto.request.onboarding.InitialTemplateGenerateRequest;
 import com.emailagent.dto.response.onboarding.InitialTemplateGenerateResponse;
 import com.emailagent.dto.response.onboarding.OnboardingStatusResponse;
 import com.emailagent.exception.ResourceNotFoundException;
-import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
-import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
-import com.emailagent.rabbitmq.publisher.RagPublisher;
 import com.emailagent.domain.entity.BusinessFaq;
 import com.emailagent.domain.entity.BusinessResource;
+import com.emailagent.rag.application.RagIntegrationService;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.BusinessFaqRepository;
 import com.emailagent.repository.BusinessResourceRepository;
@@ -20,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -32,7 +29,7 @@ public class OnboardingService {
     private final BusinessFaqRepository faqRepository;
     private final BusinessResourceRepository resourceRepository;
     private final BusinessService businessService;
-    private final RagPublisher ragPublisher;
+    private final RagIntegrationService ragIntegrationService;
 
     // =============================================
     // GET /api/onboarding/status
@@ -80,45 +77,18 @@ public class OnboardingService {
         List<BusinessResource> selectedResources = resolveSelectedResources(userId, request.getResourceIds());
 
         // 3. 선택된 FAQ / PDF를 knowledge ingest 큐에 발행
-        String knowledgeJobId = publishKnowledgeIngest(userId, selectedFaqs, selectedResources);
+        String knowledgeJobId = ragIntegrationService.requestKnowledgeIngest(userId, selectedFaqs, selectedResources);
 
         // 4. RAG context 생성
         String ragContext = businessService.buildRagContext(userId);
 
         // 5. 카테고리별로 RAG draft 큐에 템플릿 생성 요청 발행 (mode="generate")
-        List<String> draftJobIds = categories.stream()
-                .map(category -> {
-                    String requestId = UUID.randomUUID().toString();
-                    String jobId = "rag-draft-" + userId + "-" + category.getCategoryId() + "-" + requestId;
-
-                    RagDraftGenerateRequestDTO message = RagDraftGenerateRequestDTO.builder()
-                            .jobId(jobId)
-                            .requestId(requestId)
-                            .userId(userId)
-                            .mode("generate")
-                            .categoryId(category.getCategoryId())
-                            .categoryName(category.getCategoryName())
-                            .categoryKeywords(category.getKeywords())
-                            .industryType(request.getIndustryType())
-                            .emailTone(request.getEmailTone())
-                            .companyDescription(request.getCompanyDescription())
-                            .ragContext(ragContext)
-                            .templateCount(3)
-                            .build();
-
-                    ragPublisher.publishDraftGeneration(message);
-
-                    log.info(
-                            "[OnboardingService] RAG 초기 템플릿 생성 요청 발행 — userId={}, categoryId={}, categoryName={}, jobId={}, requestId={}",
-                            userId,
-                            category.getCategoryId(),
-                            category.getCategoryName(),
-                            jobId,
-                            requestId
-                    );
-                    return jobId;
-                })
-                .toList();
+        List<String> draftJobIds = ragIntegrationService.requestInitialTemplateDrafts(
+                userId,
+                categories,
+                request,
+                ragContext
+        );
 
         // 6. processing_count = category_ids 개수 반환
         return InitialTemplateGenerateResponse.of(categories.size(), draftJobIds, knowledgeJobId);
@@ -144,47 +114,5 @@ public class OnboardingService {
                 .map(resourceId -> resourceRepository.findByResourceIdAndUser_UserId(resourceId, userId)
                         .orElseThrow(() -> new ResourceNotFoundException("파일을 찾을 수 없습니다: " + resourceId)))
                 .toList();
-    }
-
-    private String publishKnowledgeIngest(
-            Long userId,
-            List<BusinessFaq> faqs,
-            List<BusinessResource> resources
-    ) {
-        if (faqs.isEmpty() && resources.isEmpty()) {
-            log.info("[OnboardingService] 선택된 FAQ/PDF가 없어 knowledge ingest 발행을 생략합니다. userId={}", userId);
-            return null;
-        }
-
-        String requestId = UUID.randomUUID().toString();
-        String jobId = "rag-ingest-" + userId + "-" + requestId;
-
-        RagKnowledgeIngestRequestDTO message = RagKnowledgeIngestRequestDTO.builder()
-                .jobId(jobId)
-                .requestId(requestId)
-                .userId(userId)
-                .payload(
-                        RagKnowledgeIngestRequestDTO.Payload.builder()
-                                .faqs(faqs.stream()
-                                        .map(faq -> RagKnowledgeIngestRequestDTO.FaqItem.builder()
-                                                .sourceId("faq-" + faq.getFaqId())
-                                                .question(faq.getQuestion())
-                                                .answer(faq.getAnswer())
-                                                .build())
-                                        .toList())
-                                .manuals(resources.stream()
-                                        .map(resource -> RagKnowledgeIngestRequestDTO.ManualItem.builder()
-                                                .sourceId("manual-" + resource.getResourceId())
-                                                .title(resource.getTitle())
-                                                .fileName(resource.getFileName())
-                                                .localPath(resource.getFilePath())
-                                                .build())
-                                        .toList())
-                                .build()
-                )
-                .build();
-
-        ragPublisher.publishKnowledgeIngest(message);
-        return jobId;
     }
 }

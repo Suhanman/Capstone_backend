@@ -10,9 +10,8 @@ import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
-import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.event.SseEvent;
-import com.emailagent.rabbitmq.publisher.RagPublisher;
+import com.emailagent.rag.application.RagIntegrationService;
 import com.emailagent.repository.CalendarEventRepository;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
@@ -52,7 +51,7 @@ public class MailServiceImpl implements MailService {
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
     private final EmailAnalysisResultRepository analysisResultRepository;
-    private final RagPublisher ragPublisher;
+    private final RagIntegrationService ragIntegrationService;
     private final ApplicationEventPublisher eventPublisher;
     private final CalendarEventRepository calendarEventRepository;
 
@@ -139,7 +138,7 @@ public class MailServiceImpl implements MailService {
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);
-        publishTemplateMatch(email, analysisResult);
+        ragIntegrationService.requestTemplateMatch(email, analysisResult);
 
         // schedule_detected=true 이면 CalendarEvent(PENDING) 자동 생성
         if (result.isScheduleDetected()) {
@@ -241,40 +240,6 @@ public class MailServiceImpl implements MailService {
     // ===================================================
     // 내부 유틸
     // ===================================================
-
-    private void publishTemplateMatch(Email email, EmailAnalysisResult analysisResult) {
-        if (analysisResult.getIntent() == null || analysisResult.getSummaryText() == null) {
-            log.debug(
-                    "[MailService] templates.match 발행 생략 — emailId={}, intent={}, summary={}",
-                    email.getEmailId(),
-                    analysisResult.getIntent(),
-                    analysisResult.getSummaryText()
-            );
-            return;
-        }
-
-        String requestId = "template-match-" + email.getEmailId();
-        String jobId = "template-match-" + email.getEmailId();
-
-        RagTemplateMatchRequestDTO payload = RagTemplateMatchRequestDTO.builder()
-                .jobId(jobId)
-                .requestId(requestId)
-                .userId(email.getUser().getUserId())
-                .payload(
-                        RagTemplateMatchRequestDTO.Payload.builder()
-                                .emailId(String.valueOf(email.getEmailId()))
-                                .subject(email.getSubject())
-                                .body(email.getBodyClean())
-                                .summary(analysisResult.getSummaryText())
-                                .intent(analysisResult.getIntent())
-                                .domain(analysisResult.getDomain())
-                                .topK(3)
-                                .build()
-                )
-                .build();
-
-        ragPublisher.publishTemplateMatch(payload);
-    }
 
     /**
      * schedule_detected=true 일 때 CalendarEvent(PENDING)를 생성한다.
