@@ -36,3 +36,6 @@ build/
 .env
 application-local.yml
 application-secret.yml
+
+### Local runtime data ###
+/docker/mariadb/data/

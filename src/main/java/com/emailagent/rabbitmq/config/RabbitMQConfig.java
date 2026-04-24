@@ -14,9 +14,9 @@ import org.springframework.context.annotation.Configuration;
  * RabbitMQ 설정
  *
  * [설계 원칙]
- * - Exchange / Queue / Binding 등 RabbitMQ 리소스는 Terraform에서 관리.
- * - Spring Boot는 리소스 생성 권한이 없으며, passive 선언(존재 여부 확인)만 수행.
- * - DLX 설정, TTL 등 브로커 리소스 속성은 일체 선언하지 않음.
+ * - Exchange / Queue / Binding 등 RabbitMQ 리소스는 인프라에서 관리.
+ * - 로컬 smoke test에서도 운영과 같은 원칙으로 별도 setup script / RabbitMQ definitions에서 생성한다.
+ * - 운영형 DLX 설정, TTL 등 브로커 리소스 속성은 앱 코드에서 선언하지 않음.
  */
 @Slf4j
 @Configuration

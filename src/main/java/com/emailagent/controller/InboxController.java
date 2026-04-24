@@ -7,6 +7,7 @@ import com.emailagent.dto.response.inbox.AttachmentDownloadResult;
 import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxListResponse;
+import com.emailagent.dto.response.inbox.InboxRecommendationsResponse;
 import com.emailagent.dto.response.inbox.RegenerateResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.InboxService;
@@ -43,6 +44,15 @@ public class InboxController {
             @CurrentUser Long userId,
             @PathVariable Long emailId) {
         return ResponseEntity.ok(inboxService.getDetail(userId, emailId));
+    }
+
+    // GET /api/inbox/{email_id}/recommendations
+    @GetMapping("/{emailId}/recommendations")
+    public ResponseEntity<InboxRecommendationsResponse> getRecommendations(
+            @CurrentUser Long userId,
+            @PathVariable Long emailId,
+            @RequestParam(defaultValue = "3") int topK) {
+        return ResponseEntity.ok(inboxService.getRecommendations(userId, emailId, topK));
     }
 
     // POST /api/inbox/{email_id}/regenerate

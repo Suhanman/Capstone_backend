@@ -19,6 +19,10 @@ spring:
     username: ${RABBITMQ_USER}
     password: ${RABBITMQ_PASS}
     virtual-host: /
+  servlet:
+    multipart:
+      max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:12MB}
 
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-change-in-production}
