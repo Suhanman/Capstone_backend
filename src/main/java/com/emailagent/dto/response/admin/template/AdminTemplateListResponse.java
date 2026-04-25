@@ -26,6 +26,9 @@ public class AdminTemplateListResponse extends BaseResponse {
         @JsonProperty("template_id")
         private final long templateId;
 
+        @JsonProperty("user_template_no")
+        private final Long userTemplateNo;
+
         @JsonProperty("user_id")
         private final long userId;
 
@@ -49,10 +52,11 @@ public class AdminTemplateListResponse extends BaseResponse {
 
         private final String quality;
 
-        public TemplateItem(long templateId, long userId, String title, String createdAt,
+        public TemplateItem(long templateId, Long userTemplateNo, long userId, String title, String createdAt,
                             String category, String industry, Integer useCount, Integer userCount,
                             LocalDateTime generatedAt, String quality) {
             this.templateId = templateId;
+            this.userTemplateNo = userTemplateNo;
             this.userId = userId;
             this.title = title;
             this.createdAt = createdAt;

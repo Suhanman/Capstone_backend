@@ -54,6 +54,7 @@ public class AdminTemplateService {
         List<AdminTemplateListResponse.TemplateItem> items = templatePage.getContent().stream()
                 .map(t -> new AdminTemplateListResponse.TemplateItem(
                         t.getTemplateId(),
+                        t.getUserTemplateNo(),
                         t.getUser().getUserId(),
                         t.getTitle(),
                         t.getCreatedAt().toInstant(ZoneOffset.UTC).toString(),

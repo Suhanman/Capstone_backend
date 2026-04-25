@@ -38,6 +38,7 @@ public class RagResultService {
     private final BusinessProfileRepository profileRepository;
     private final EmailRepository emailRepository;
     private final EmailTemplateRecommendationRepository recommendationRepository;
+    private final TemplateNumberService templateNumberService;
     private final RagPublisher ragPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -98,6 +99,7 @@ public class RagResultService {
                     return existing;
                 })
                 .orElseGet(() -> Template.builder()
+                        .userTemplateNo(templateNumberService.nextUserTemplateNo(userId))
                         .user(category.getUser())
                         .category(category)
                         .title(item.getTitle())
