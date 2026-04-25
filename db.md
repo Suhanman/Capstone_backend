@@ -136,6 +136,7 @@ CREATE TABLE categories (
 ```sql
 CREATE TABLE templates (
     template_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 템플릿 ID
+    user_template_no BIGINT NULL, -- 사용자별 템플릿 표시 번호
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_id BIGINT NOT NULL, -- 카테고리 ID
     title VARCHAR(255) NOT NULL, -- 템플릿 제목
@@ -152,8 +153,35 @@ CREATE TABLE templates (
         ON DELETE CASCADE,
     CONSTRAINT fk_templates_category
         FOREIGN KEY (category_id) REFERENCES categories(category_id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT uk_templates_user_template_no
+        UNIQUE (user_id, user_template_no)
 );
+```
+
+기존 데이터가 있는 환경에서는 `user_template_no`를 추가한 뒤 사용자별 기존 템플릿에 순번을 백필한다.
+
+```sql
+ALTER TABLE templates
+    ADD COLUMN user_template_no BIGINT NULL;
+
+SET @prev_user_id := NULL;
+SET @template_no := 0;
+
+UPDATE templates t
+JOIN (
+    SELECT
+        template_id,
+        @template_no := IF(@prev_user_id = user_id, @template_no + 1, 1) AS next_no,
+        @prev_user_id := user_id
+    FROM templates
+    ORDER BY user_id, template_id
+) numbered ON numbered.template_id = t.template_id
+SET t.user_template_no = numbered.next_no
+WHERE t.user_template_no IS NULL;
+
+ALTER TABLE templates
+    ADD CONSTRAINT uk_templates_user_template_no UNIQUE (user_id, user_template_no);
 ```
 
 # 7-1. rag_jobs

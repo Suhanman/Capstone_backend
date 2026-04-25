@@ -26,6 +26,7 @@ public class TemplateService {
     private final TemplateRepository templateRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final TemplateNumberService templateNumberService;
 
     @Transactional(readOnly = true)
     public TemplateListResponse getTemplates(Long userId) {
@@ -53,6 +54,7 @@ public class TemplateService {
                 .orElseThrow(() -> new IllegalArgumentException("카테고리 없음"));
 
         Template template = Template.builder()
+                .userTemplateNo(templateNumberService.nextUserTemplateNo(userId))
                 .user(user)
                 .category(category)
                 .title(request.getTitle())
