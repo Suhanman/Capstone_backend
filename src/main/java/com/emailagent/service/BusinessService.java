@@ -10,10 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.*;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,9 +25,10 @@ public class BusinessService {
     private final CategoryRepository categoryRepository;
     private final TemplateRepository templateRepository;
     private final UserRepository userRepository;
+    private final S3Service s3Service;
 
-    @Value("${app.file.upload-dir:uploads}")
-    private String uploadDir;
+    @Value("${app.cloud.aws.s3.prefix}")
+    private String s3Prefix;
 
     // =============================================
     // 비즈니스 프로필 (Upsert)
@@ -73,28 +71,53 @@ public class BusinessService {
                 .build();
     }
 
+    /**
+     * S3 Presigned PUT URL을 발급한다.
+     * S3 키 형식: {s3Prefix}/{userId}/{uuid}_{fileName}  (s3Prefix = S3_PREFIX 환경변수)
+     * 클라이언트는 반환된 presigned_url로 직접 PUT 업로드 후 /files 엔드포인트로 확정한다.
+     */
+    public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
+        // 경로 순회 공격 방지: 파일명에서 디렉터리 구분자 제거
+        String safeFileName = request.getFileName().replaceAll("[/\\\\]", "_");
+        String s3Key = s3Prefix + "/" + userId + "/" + UUID.randomUUID() + "_" + safeFileName;
+        String contentType = (request.getContentType() != null && !request.getContentType().isBlank())
+                ? request.getContentType()
+                : "application/octet-stream";
+
+        String presignedUrl = s3Service.generatePresignedPutUrl(s3Key, contentType);
+
+        return PresignedUrlResponse.builder()
+                .presignedUrl(presignedUrl)
+                .s3Key(s3Key)
+                .build();
+    }
+
+    /**
+     * 클라이언트의 S3 직접 업로드 완료 후 DB에 리소스 메타데이터를 저장한다.
+     * s3Key 소유권 검증: "{s3Prefix}/{userId}/" 접두사로 다른 사용자 파일 등록 차단.
+     */
     @Transactional
-    public BusinessResourceResponse uploadFile(Long userId, MultipartFile file) throws IOException {
+    public BusinessResourceResponse confirmUpload(Long userId, FileConfirmRequest request) {
+        // s3Key가 이 사용자 소유인지 검증
+        String expectedPrefix = s3Prefix + "/" + userId + "/";
+        if (!request.getS3Key().startsWith(expectedPrefix)) {
+            throw new IllegalArgumentException("잘못된 s3_key입니다.");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
 
-        String originalFileName = file.getOriginalFilename();
-        String savedFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path uploadPath = Paths.get(uploadDir, String.valueOf(userId));
-        Files.createDirectories(uploadPath);
-        Path filePath = uploadPath.resolve(savedFileName);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
+        String fileName = request.getFileName();
         String fileType = "";
-        if (originalFileName != null && originalFileName.contains(".")) {
-            fileType = originalFileName.substring(originalFileName.lastIndexOf(".") + 1).toUpperCase();
+        if (fileName.contains(".")) {
+            fileType = fileName.substring(fileName.lastIndexOf(".") + 1).toUpperCase();
         }
 
         BusinessResource resource = BusinessResource.builder()
                 .user(user)
-                .title(originalFileName)
-                .fileName(originalFileName)
-                .filePath(filePath.toString())
+                .title(fileName)
+                .fileName(fileName)
+                .filePath(request.getS3Key())   // s3Key를 filePath에 저장
                 .fileType(fileType)
                 .build();
 
@@ -108,9 +131,9 @@ public class BusinessService {
                 .orElseThrow(() -> new ResourceNotFoundException("파일을 찾을 수 없습니다."));
 
         try {
-            Files.deleteIfExists(Paths.get(resource.getFilePath()));
-        } catch (IOException e) {
-            log.warn("파일 삭제 실패: {}", resource.getFilePath());
+            s3Service.deleteObject(resource.getFilePath());
+        } catch (Exception e) {
+            log.warn("S3 객체 삭제 실패 (DB 레코드는 삭제 진행): key={}", resource.getFilePath());
         }
 
         resourceRepository.delete(resource);

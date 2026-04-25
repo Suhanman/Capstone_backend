@@ -22,7 +22,7 @@ spring:
   servlet:
     multipart:
       max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:10MB}
-      max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:12MB}
+      max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:10MB}
 
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-change-in-production}
@@ -82,6 +82,17 @@ app:
     namespace: ${K8S_NAMESPACE:job}
     job-image: ${K8S_TRAINING_JOB_IMAGE:placeholder}
     ttl-seconds-after-finished: 300
+
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY} # 환경 변수로 관리 권장
+        secret-key: ${AWS_SECRET_KEY}
+      region:
+        static: ap-northeast-2 # 버킷이 생성된 리전
+      s3:
+        bucket: capstone-gachon
+        prefix: ${S3_PREFIX:rag/client}
 
 
 

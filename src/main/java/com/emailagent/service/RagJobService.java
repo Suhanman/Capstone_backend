@@ -92,7 +92,18 @@ public class RagJobService {
 
     @Transactional
     public void applyProgress(RagProgressEventDTO progress) {
-        RagJob job = getOrCreate(progress.getJobId(), progress.getUserId(), progress.getRequestId(), progress.getJobType(), progress.getTargetType(), progress.getTargetId());
+        // SELECT FOR UPDATE: 동시 progress/result 처리 경쟁 방지 (job이 없으면 생성)
+        RagJob job = getOrCreateForUpdate(
+                progress.getJobId(), progress.getUserId(), progress.getRequestId(),
+                progress.getJobType(), progress.getTargetType(), progress.getTargetId()
+        );
+
+        // 이미 종료 상태(COMPLETED/FAILED)인 job에 progress 이벤트가 늦게 도착한 경우 스킵
+        if (job.isTerminal()) {
+            log.debug("[RagJobService] progress 무시 — 이미 종료 상태: jobId={}, status={}", job.getJobId(), job.getStatus());
+            return;
+        }
+
         String payloadJson = toJson(progress.getPayload());
 
         if ("FAILED".equalsIgnoreCase(progress.getStatus())) {
@@ -111,9 +122,10 @@ public class RagJobService {
 
     @Transactional
     public void completeKnowledgeIngest(RagKnowledgeIngestResultDTO result) {
-        RagJob job = getOrCreate(result.getJobId(), result.getUserId(), result.getRequestId(), "knowledge.ingest", "knowledge", null);
-        String payloadJson = toJson(result.getPayload());
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
+        RagJob job = getForUpdate(result.getJobId());
 
+        String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
             job.markCompleted("INDEXED", "지식 적재가 완료되었습니다.", payloadJson);
         } else {
@@ -127,9 +139,11 @@ public class RagJobService {
     @Transactional
     public void completeTemplateIndex(String requestId, Long userId, RagTemplateIndexResultDTO result) {
         String jobId = "template-index-" + userId + "-" + requestId;
-        RagJob job = getOrCreate(jobId, userId, requestId, "templates.index", "template", null);
-        String payloadJson = toJson(result.getPayload());
+        // template-index job은 결과 수신 시점에 생성될 수 있으므로 getOrCreateForUpdate 사용
+        // result 메시지는 항상 최종 상태를 덮어쓴다
+        RagJob job = getOrCreateForUpdate(jobId, userId, requestId, "templates.index", "template", null);
 
+        String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
             job.markCompleted("INDEXED", "템플릿 인덱싱이 완료되었습니다.", payloadJson);
         } else {
@@ -142,10 +156,10 @@ public class RagJobService {
 
     @Transactional
     public void completeTemplateMatch(RagTemplateMatchResultDTO result) {
-        String targetId = result.getPayload() != null ? result.getPayload().getEmailId() : null;
-        RagJob job = getOrCreate(result.getJobId(), result.getUserId(), result.getRequestId(), "templates.match", "email", targetId);
-        String payloadJson = toJson(result.getPayload());
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
+        RagJob job = getForUpdate(result.getJobId());
 
+        String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
             job.markCompleted("MATCHED", "추천 템플릿 조회가 완료되었습니다.", payloadJson);
         } else {
@@ -158,12 +172,10 @@ public class RagJobService {
 
     @Transactional
     public void completeDraftGeneration(RagDraftGenerateResultDTO result) {
-        String targetId = result.getPayload() != null && result.getPayload().getCategoryId() != null
-                ? String.valueOf(result.getPayload().getCategoryId())
-                : null;
-        RagJob job = getOrCreate(result.getJobId(), result.getUserId(), result.getRequestId(), "draft.generate", "category", targetId);
-        String payloadJson = toJson(result.getPayload());
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
+        RagJob job = getForUpdate(result.getJobId());
 
+        String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
             job.markCompleted("GENERATED", "카테고리별 맞춤 템플릿 생성이 완료되었습니다.", payloadJson);
         } else {
@@ -200,11 +212,53 @@ public class RagJobService {
         return job;
     }
 
-    private RagJob getExisting(String jobId) {
-        return ragJobRepository.findById(jobId)
+    /**
+     * 업데이트 경로 전용 — SELECT FOR UPDATE로 행을 잠근 후 반환.
+     * job이 반드시 존재해야 하는 complete 메서드에서만 사용한다.
+     */
+    private RagJob getForUpdate(String jobId) {
+        return ragJobRepository.findByIdForUpdate(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("RAG Job을 찾을 수 없습니다: " + jobId));
     }
 
+    /**
+     * 업데이트 경로 전용 — SELECT FOR UPDATE로 잠금을 시도하되, 행이 없으면 생성 후 반환.
+     * applyProgress, completeTemplateIndex처럼 job이 지연 생성될 수 있는 경우에 사용한다.
+     */
+    private RagJob getOrCreateForUpdate(
+            String jobId,
+            Long userId,
+            String requestId,
+            String jobType,
+            String targetType,
+            String targetId
+    ) {
+        return ragJobRepository.findByIdForUpdate(jobId)
+                .orElseGet(() -> {
+                    try {
+                        return ragJobRepository.saveAndFlush(
+                                RagJob.builder()
+                                        .jobId(jobId)
+                                        .user(resolveUser(userId))
+                                        .requestId(requestId)
+                                        .jobType(jobType != null ? jobType : "rag")
+                                        .targetType(targetType)
+                                        .targetId(targetId)
+                                        .status(RagJobStatus.QUEUED)
+                                        .build()
+                        );
+                    } catch (DataIntegrityViolationException error) {
+                        log.info("[RagJobService] job 생성 경합 감지 — 기존 row 재조회(lock): jobId={}", jobId);
+                        return ragJobRepository.findByIdForUpdate(jobId)
+                                .orElseThrow(() -> error);
+                    }
+                });
+    }
+
+    /**
+     * 잠금 없는 조회+생성 — create 계열(REQUIRES_NEW) 메서드 전용.
+     * 단일 트랜잭션 내에서 새 job을 등록할 때만 사용한다.
+     */
     private RagJob getOrCreate(
             String jobId,
             Long userId,

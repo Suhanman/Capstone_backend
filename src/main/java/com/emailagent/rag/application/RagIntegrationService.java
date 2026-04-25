@@ -10,6 +10,7 @@ import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
+import com.emailagent.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class RagIntegrationService {
 
     private final RagPublisher ragPublisher;
+    private final S3Service s3Service;
 
     public String requestKnowledgeIngest(
             Long userId,
@@ -59,7 +61,8 @@ public class RagIntegrationService {
                                                 .sourceId("manual-" + resource.getResourceId())
                                                 .title(resource.getTitle())
                                                 .fileName(resource.getFileName())
-                                                .localPath(resource.getFilePath())
+                                                // s3Key(filePath)로 Presigned GET URL 생성 — AI 서버가 직접 다운로드
+                                                .presignedUrl(s3Service.generatePresignedGetUrl(resource.getFilePath()))
                                                 .build())
                                         .toList())
                                 .build()
