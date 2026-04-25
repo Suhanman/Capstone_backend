@@ -7,6 +7,7 @@ import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,9 @@ public class BusinessService {
     private final TemplateRepository templateRepository;
     private final UserRepository userRepository;
     private final S3Service s3Service;
+
+    @Value("${app.cloud.aws.s3.prefix}")
+    private String s3Prefix;
 
     // =============================================
     // 비즈니스 프로필 (Upsert)
@@ -69,13 +73,13 @@ public class BusinessService {
 
     /**
      * S3 Presigned PUT URL을 발급한다.
-     * S3 키 형식: resources/{userId}/{uuid}_{fileName}
+     * S3 키 형식: {s3Prefix}/{userId}/{uuid}_{fileName}  (s3Prefix = S3_PREFIX 환경변수)
      * 클라이언트는 반환된 presigned_url로 직접 PUT 업로드 후 /files 엔드포인트로 확정한다.
      */
     public PresignedUrlResponse generatePresignedUrl(Long userId, PresignedUrlRequest request) {
         // 경로 순회 공격 방지: 파일명에서 디렉터리 구분자 제거
         String safeFileName = request.getFileName().replaceAll("[/\\\\]", "_");
-        String s3Key = "resources/" + userId + "/" + UUID.randomUUID() + "_" + safeFileName;
+        String s3Key = s3Prefix + "/" + userId + "/" + UUID.randomUUID() + "_" + safeFileName;
         String contentType = (request.getContentType() != null && !request.getContentType().isBlank())
                 ? request.getContentType()
                 : "application/octet-stream";
@@ -90,12 +94,12 @@ public class BusinessService {
 
     /**
      * 클라이언트의 S3 직접 업로드 완료 후 DB에 리소스 메타데이터를 저장한다.
-     * s3Key 소유권 검증: "resources/{userId}/" 접두사로 다른 사용자 파일 등록 차단.
+     * s3Key 소유권 검증: "{s3Prefix}/{userId}/" 접두사로 다른 사용자 파일 등록 차단.
      */
     @Transactional
     public BusinessResourceResponse confirmUpload(Long userId, FileConfirmRequest request) {
         // s3Key가 이 사용자 소유인지 검증
-        String expectedPrefix = "resources/" + userId + "/";
+        String expectedPrefix = s3Prefix + "/" + userId + "/";
         if (!request.getS3Key().startsWith(expectedPrefix)) {
             throw new IllegalArgumentException("잘못된 s3_key입니다.");
         }
