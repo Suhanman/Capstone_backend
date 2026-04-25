@@ -8,12 +8,8 @@ import com.emailagent.service.BusinessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/business")
@@ -56,12 +52,21 @@ public class BusinessController {
         return ResponseEntity.ok(businessService.getFiles(userId));
     }
 
-    @PostMapping(value = "/resources/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<BusinessResourceResponse> uploadFile(
+    // 1단계: Presigned PUT URL 발급
+    @PostMapping("/resources/presigned-url")
+    public ResponseEntity<PresignedUrlResponse> getPresignedUrl(
             @CurrentUser Long userId,
-            @RequestParam("file") MultipartFile file) throws IOException {
+            @Valid @RequestBody PresignedUrlRequest request) {
+        return ResponseEntity.ok(businessService.generatePresignedUrl(userId, request));
+    }
+
+    // 2단계: S3 직접 업로드 완료 후 메타데이터 저장 확정
+    @PostMapping("/resources/files")
+    public ResponseEntity<BusinessResourceResponse> confirmUpload(
+            @CurrentUser Long userId,
+            @Valid @RequestBody FileConfirmRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(businessService.uploadFile(userId, file));
+                .body(businessService.confirmUpload(userId, request));
     }
 
     @DeleteMapping("/resources/files/{resourceId}")
