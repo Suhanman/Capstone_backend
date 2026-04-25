@@ -7,12 +7,15 @@ import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.*;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -25,7 +28,9 @@ public class BusinessService {
     private final CategoryRepository categoryRepository;
     private final TemplateRepository templateRepository;
     private final UserRepository userRepository;
-    private final BusinessFileStorageService fileStorageService;
+
+    @Value("${app.file.upload-dir:uploads}")
+    private String uploadDir;
 
     // =============================================
     // 비즈니스 프로필 (Upsert)
@@ -74,7 +79,11 @@ public class BusinessService {
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다."));
 
         String originalFileName = file.getOriginalFilename();
-        String storedFilePath = fileStorageService.store(userId, file);
+        String savedFileName = UUID.randomUUID() + "_" + originalFileName;
+        Path uploadPath = Paths.get(uploadDir, String.valueOf(userId));
+        Files.createDirectories(uploadPath);
+        Path filePath = uploadPath.resolve(savedFileName);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
         String fileType = "";
         if (originalFileName != null && originalFileName.contains(".")) {
@@ -85,7 +94,7 @@ public class BusinessService {
                 .user(user)
                 .title(originalFileName)
                 .fileName(originalFileName)
-                .filePath(storedFilePath)
+                .filePath(filePath.toString())
                 .fileType(fileType)
                 .build();
 
@@ -98,7 +107,11 @@ public class BusinessService {
                 .findByResourceIdAndUser_UserId(resourceId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("파일을 찾을 수 없습니다."));
 
-        fileStorageService.delete(resource);
+        try {
+            Files.deleteIfExists(Paths.get(resource.getFilePath()));
+        } catch (IOException e) {
+            log.warn("파일 삭제 실패: {}", resource.getFilePath());
+        }
 
         resourceRepository.delete(resource);
     }

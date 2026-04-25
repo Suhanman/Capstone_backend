@@ -31,13 +31,7 @@ jwt:
 
 app:
   file:
-    storage: ${APP_FILE_STORAGE:local} # local 또는 s3
-    upload-dir: ${APP_FILE_UPLOAD_DIR:C:/dev/uploads}   # local 모드 파일 업로드 저장 경로
-    s3:
-      bucket: ${APP_FILE_S3_BUCKET:}
-      prefix: ${APP_FILE_S3_PREFIX:business-resources}
-      region: ${AWS_REGION:ap-northeast-2}
-      presigned-url-duration-minutes: ${APP_FILE_S3_PRESIGNED_URL_DURATION_MINUTES:15}
+    upload-dir: C:/dev/uploads   # 파일 업로드 저장 경로
   rabbitmq:
     exchange:
       app2ai: x.app2ai.direct

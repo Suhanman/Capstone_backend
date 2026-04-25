@@ -10,7 +10,6 @@ import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
-import com.emailagent.service.BusinessFileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,6 @@ import java.util.UUID;
 public class RagIntegrationService {
 
     private final RagPublisher ragPublisher;
-    private final BusinessFileStorageService fileStorageService;
 
     public String requestKnowledgeIngest(
             Long userId,
@@ -61,8 +59,7 @@ public class RagIntegrationService {
                                                 .sourceId("manual-" + resource.getResourceId())
                                                 .title(resource.getTitle())
                                                 .fileName(resource.getFileName())
-                                                .localPath(fileStorageService.isS3Mode() ? null : resource.getFilePath())
-                                                .presignedUrl(fileStorageService.createPresignedGetUrl(resource))
+                                                .localPath(resource.getFilePath())
                                                 .build())
                                         .toList())
                                 .build()
