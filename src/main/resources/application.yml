@@ -92,6 +92,7 @@ app:
         static: ap-northeast-2 # 버킷이 생성된 리전
       s3:
         bucket: capstone-gachon
+        prefix: ${S3_PREFIX:rag/client}
 
 
 
