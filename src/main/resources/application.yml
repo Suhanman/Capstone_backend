@@ -83,6 +83,16 @@ app:
     job-image: ${K8S_TRAINING_JOB_IMAGE:placeholder}
     ttl-seconds-after-finished: 300
 
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY} # 환경 변수로 관리 권장
+        secret-key: ${AWS_SECRET_KEY}
+      region:
+        static: ap-northeast-2 # 버킷이 생성된 리전
+      s3:
+        bucket: capstone-gachon
+
 
 
   webhook:

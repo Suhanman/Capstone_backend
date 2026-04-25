@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * FAQ / 업로드 PDF를 RAG knowledge index에 적재하기 위한 요청 메시지 DTO.
  *
- * RAG 쪽 ingest 계약에 맞춰 manual 입력은 PDF 전용 local_path 기준으로 구성한다.
+ * manual 파일은 S3 Presigned GET URL로 전달하며, AI 서버가 직접 다운로드한다.
  */
 @Getter
 @Builder
@@ -62,7 +62,7 @@ public class RagKnowledgeIngestRequestDTO {
         @JsonProperty("file_name")
         private String fileName;
 
-        @JsonProperty("local_path")
-        private String localPath;
+        @JsonProperty("presigned_url")
+        private String presignedUrl;
     }
 }
