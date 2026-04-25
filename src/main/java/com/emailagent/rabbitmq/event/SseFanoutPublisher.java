@@ -34,7 +34,8 @@ public class SseFanoutPublisher {
         // SSE Hub가 브라우저 연결을 식별·라우팅하기 위한 최소 payload
         Map<String, Object> payload = Map.of(
                 "user_id",  event.getUserId(),
-                "sse_type", event.getSseType()
+                "sse_type", event.getSseType(),
+                "data", event.getData() != null ? event.getData() : Map.of()
         );
 
         try {

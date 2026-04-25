@@ -56,6 +56,9 @@ public class DraftReply {
         this.status = status;
     }
 
+    /**
+     * draft 큐 결과 수신 후 내용 갱신
+     */
     public void updateContent(String draftSubject, String draftContent) {
         this.draftSubject = draftSubject;
         this.draftContent = draftContent;

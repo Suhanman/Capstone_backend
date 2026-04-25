@@ -187,6 +187,7 @@ public class BusinessService {
                 .user(user)
                 .categoryName(request.getCategoryName())
                 .color(request.getColor())
+                .keywords(request.getKeywords())
                 .build();
 
         return CategoryResponse.from(categoryRepository.save(category));

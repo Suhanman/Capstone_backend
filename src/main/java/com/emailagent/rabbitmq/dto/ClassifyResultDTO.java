@@ -12,7 +12,7 @@ import java.util.Map;
  * q.2app.classify 큐에서 수신하며, EmailAnalysisResult 엔티티 업데이트에 사용된다.
  *
  * [필드 기준]
- * EmailAnalysisResult.updateFromClassify() 시그니처 및 엔티티 필드 기준으로 정의.
+ * EmailAnalysisResult.updateFromClassify() 시그니처 및 엔티티 필드 기준으로 정의한다.
  */
 @Getter
 @NoArgsConstructor

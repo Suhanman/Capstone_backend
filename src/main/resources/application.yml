@@ -19,6 +19,10 @@ spring:
     username: ${RABBITMQ_USER}
     password: ${RABBITMQ_PASS}
     virtual-host: /
+  servlet:
+    multipart:
+      max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:12MB}
 
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-change-in-production}
@@ -32,17 +36,33 @@ app:
     exchange:
       app2ai: x.app2ai.direct
       ai2app: x.ai2app.direct
+      app2rag: x.app2rag.direct
+      rag2app: x.rag2app.direct
     queue:
       classify-inbound: q.2ai.classify
       classify-result: q.2app.classify
-      draft-inbound: q.2ai.draft
-      draft-result: q.2app.draft
+      knowledge-ingest-inbound: q.2rag.knowledge.ingest
+      knowledge-ingest-result: q.2app.knowledge.ingest
+      rag-draft-inbound: q.2rag.draft
+      rag-draft-result: q.2app.rag.draft
+      template-index-inbound: q.2rag.templates.index
+      template-index-result: q.2app.templates.index
+      template-match-inbound: q.2rag.templates.match
+      template-match-result: q.2app.templates.match
+      rag-progress: q.2app.rag.progress
       dlx-failed: q.dlx.failed
     routing-key:
       classify-inbound: 2ai.classify
       classify-result: 2app.classify
-      draft-inbound: 2ai.draft
-      draft-result: 2app.draft
+      knowledge-ingest-inbound: 2rag.knowledge.ingest
+      knowledge-ingest-result: 2app.knowledge.ingest
+      rag-draft-inbound: 2rag.draft
+      rag-draft-result: 2app.rag.draft
+      template-index-inbound: 2rag.templates.index
+      template-index-result: 2app.templates.index
+      template-match-inbound: 2rag.templates.match
+      template-match-result: 2app.templates.match
+      rag-progress: 2app.rag.progress
 
   ai:
     server-url: ${AI_SERVER_URL}
@@ -56,7 +76,7 @@ app:
     topic-name: ${GOOGLE_TOPIC_NAME}
     frontend:
       base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
-    email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email
+    email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email}
 
   kubernetes:
     namespace: ${K8S_NAMESPACE:job}

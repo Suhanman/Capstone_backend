@@ -117,6 +117,7 @@ CREATE TABLE categories (
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_name VARCHAR(100) NOT NULL, -- 카테고리명
     color VARCHAR(30), -- 표시 색상
+    keywords TEXT NULL, -- 카테고리별 검색 키워드(JSON 배열)
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
 
@@ -138,6 +139,7 @@ CREATE TABLE templates (
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_id BIGINT NOT NULL, -- 카테고리 ID
     title VARCHAR(255) NOT NULL, -- 템플릿 제목
+    variant_label VARCHAR(100) NULL, -- 카테고리 내 템플릿 variant 구분값
     subject_template VARCHAR(500) NOT NULL, -- 제목 양식
     body_template TEXT NOT NULL, -- 본문 양식
     accuracy_score DECIMAL(5,2), -- 정확도 점수
@@ -150,6 +152,34 @@ CREATE TABLE templates (
         ON DELETE CASCADE,
     CONSTRAINT fk_templates_category
         FOREIGN KEY (category_id) REFERENCES categories(category_id)
+        ON DELETE CASCADE
+);
+```
+
+# 7-1. rag_jobs
+
+RAG 비동기 작업의 **진행 상태와 결과 메타데이터**를 저장하는 테이블
+
+```sql
+CREATE TABLE rag_jobs (
+    job_id VARCHAR(120) PRIMARY KEY, -- RAG 작업 ID
+    user_id BIGINT NOT NULL, -- 사용자 ID
+    request_id VARCHAR(120) NULL, -- 외부 요청 추적 ID
+    job_type VARCHAR(80) NOT NULL, -- 작업 유형 (knowledge.ingest, draft.generate 등)
+    target_type VARCHAR(80) NULL, -- 작업 대상 유형
+    target_id VARCHAR(120) NULL, -- 작업 대상 ID
+    status ENUM('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'QUEUED', -- 작업 상태
+    progress_step VARCHAR(120) NULL, -- 현재 단계 코드
+    progress_message VARCHAR(500) NULL, -- 사용자 표시용 진행 메시지
+    error_code VARCHAR(120) NULL, -- 실패 코드
+    error_message TEXT NULL, -- 실패 메시지
+    payload_json TEXT NULL, -- 마지막 payload 스냅샷
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
+    completed_at DATETIME NULL, -- 완료 또는 실패 시각
+
+    CONSTRAINT fk_ragjobs_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
 );
 ```
@@ -237,6 +267,36 @@ CREATE TABLE email_analysis_results (
     CONSTRAINT fk_emailanalysisresults_category
         FOREIGN KEY (category_id) REFERENCES categories(category_id)
         ON DELETE SET NULL
+);
+```
+
+# 10-1. email_template_recommendations
+
+RAG `templates.match` 결과를 기준으로 이메일별 **추천 템플릿 후보**를 저장하는 테이블
+
+```sql
+CREATE TABLE email_template_recommendations (
+    recommendation_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 추천 ID
+    user_id BIGINT NOT NULL, -- 사용자 ID
+    email_id BIGINT NOT NULL, -- 이메일 ID
+    template_id BIGINT NOT NULL, -- 추천 템플릿 ID
+    score DOUBLE NOT NULL, -- 템플릿 매칭 점수
+    rank_order INT NOT NULL, -- 추천 순위
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- 수정 일시
+
+    CONSTRAINT uq_email_template_recommendation_email_template
+        UNIQUE (email_id, template_id),
+    CONSTRAINT fk_emailtemplrec_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_emailtemplrec_email
+        FOREIGN KEY (email_id) REFERENCES emails(email_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_emailtemplrec_template
+        FOREIGN KEY (template_id) REFERENCES templates(template_id)
+        ON DELETE CASCADE
 );
 ```
 

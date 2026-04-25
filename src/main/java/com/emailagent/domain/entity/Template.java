@@ -32,6 +32,9 @@ public class Template {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
+    @Column(name = "variant_label", length = 100)
+    private String variantLabel;
+
     @Column(name = "subject_template", nullable = false, length = 500)
     private String subjectTemplate;
 
@@ -57,8 +60,9 @@ public class Template {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public void update(String title, String subjectTemplate, String bodyTemplate) {
+    public void update(String title, String variantLabel, String subjectTemplate, String bodyTemplate) {
         this.title = title;
+        this.variantLabel = variantLabel;
         this.subjectTemplate = subjectTemplate;
         this.bodyTemplate = bodyTemplate;
     }

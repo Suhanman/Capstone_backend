@@ -13,6 +13,7 @@ import com.emailagent.dto.response.inbox.InboxActionResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse;
 import com.emailagent.dto.response.inbox.InboxDetailResponse.*;
 import com.emailagent.dto.response.inbox.InboxListResponse;
+import com.emailagent.dto.response.inbox.InboxRecommendationsResponse;
 import com.emailagent.dto.response.inbox.RegenerateResponse;
 import com.emailagent.exception.CalendarNotConnectedException;
 import com.emailagent.exception.ResourceNotFoundException;
@@ -45,6 +46,8 @@ public class InboxService {
     private final UserRepository userRepository;
     private final IntegrationRepository integrationRepository;
     private final EmailAnalysisResultRepository emailAnalysisResultRepository;
+    private final EmailTemplateRecommendationRepository recommendationRepository;
+    private final OutboxRepository outboxRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final MailPublisher mailPublisher;
     private final BusinessService businessService;
@@ -154,6 +157,27 @@ public class InboxService {
                 .emailInfo(emailInfo)
                 .aiAnalysis(aiAnalysis)
                 .draftReply(draftReplyInfo)
+                .build();
+    }
+
+    // =============================================
+    // GET /api/inbox/{email_id}/recommendations
+    // =============================================
+
+    @Transactional(readOnly = true)
+    public InboxRecommendationsResponse getRecommendations(Long userId, Long emailId, int topK) {
+        findEmailForUser(emailId, userId);
+
+        int limit = Math.max(1, topK);
+        List<InboxRecommendationsResponse.RecommendationItem> drafts = recommendationRepository
+                .findByUserIdAndEmailIdOrderByRank(userId, emailId)
+                .stream()
+                .limit(limit)
+                .map(InboxRecommendationsResponse.RecommendationItem::from)
+                .toList();
+
+        return InboxRecommendationsResponse.builder()
+                .drafts(drafts)
                 .build();
     }
 
@@ -350,20 +374,36 @@ public class InboxService {
                 .build();
 
         Email saved = emailRepository.save(email);
+        Outbox outbox = outboxRepository.save(Outbox.builder()
+                .email(saved)
+                .payload(buildClassifyOutboxPayload(saved))
+                .build());
 
         return Map.of(
-                "message", "테스트 메일이 생성되었습니다.",
-                "email_id", saved.getEmailId()
+                "message", "테스트 메일과 AI 분류 Outbox가 생성되었습니다.",
+                "email_id", saved.getEmailId(),
+                "outbox_id", outbox.getOutboxId()
         );
     }
 
     // =============================================
-    // private helpers
+    // 내부 헬퍼 메서드
     // =============================================
 
     private Email findEmailForUser(Long emailId, Long userId) {
         return emailRepository.findDetailByEmailIdAndUserId(emailId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("이메일을 찾을 수 없습니다."));
+    }
+
+    private Map<String, Object> buildClassifyOutboxPayload(Email email) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("email_id", email.getEmailId());
+        payload.put("from", email.getSenderEmail());
+        payload.put("sender_name", email.getSenderName());
+        payload.put("subject", email.getSubject());
+        payload.put("body_clean", email.getBodyClean());
+        payload.put("date", email.getReceivedAt() != null ? email.getReceivedAt().toString() : null);
+        return payload;
     }
 
     private DraftReplyInfo buildDraftReplyInfo(DraftReply draft, EmailAnalysisResult ar) {

@@ -10,12 +10,15 @@ import com.emailagent.dto.response.admin.operation.AdminJobListResponse;
 import com.emailagent.dto.response.admin.operation.AdminJobSummaryResponse;
 import com.emailagent.rabbitmq.config.OutboxPolicy;
 import com.emailagent.rabbitmq.dto.ClassifyResultDTO;
+import com.emailagent.rabbitmq.event.SseEvent;
+import com.emailagent.rag.application.RagIntegrationService;
 import com.emailagent.repository.CalendarEventRepository;
 import com.emailagent.repository.EmailAnalysisResultRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,8 @@ public class MailServiceImpl implements MailService {
     private final OutboxRepository outboxRepository;
     private final EmailRepository emailRepository;
     private final EmailAnalysisResultRepository analysisResultRepository;
+    private final RagIntegrationService ragIntegrationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final CalendarEventRepository calendarEventRepository;
 
     // ===================================================
@@ -133,6 +138,7 @@ public class MailServiceImpl implements MailService {
                 result.getModelVersion()
         );
         analysisResultRepository.save(analysisResult);
+        ragIntegrationService.requestTemplateMatch(email, analysisResult);
 
         // schedule_detected=true 이면 CalendarEvent(PENDING) 자동 생성
         if (result.isScheduleDetected()) {
@@ -140,6 +146,13 @@ public class MailServiceImpl implements MailService {
         }
 
         log.info("[MailService] classify 완료 — outboxId={}, emailId={}", result.getOutboxId(), emailId);
+
+        eventPublisher.publishEvent(new SseEvent(
+                this,
+                email.getUser().getUserId(),
+                "classify-complete",
+                Map.of("email_id", emailId)
+        ));
     }
 
     @Override

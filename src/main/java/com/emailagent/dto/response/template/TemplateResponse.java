@@ -24,6 +24,9 @@ public class TemplateResponse extends BaseResponse {
 
     private String title;
 
+    @JsonProperty("variant_label")
+    private String variantLabel;
+
     @JsonProperty("subject_template")
     private String subjectTemplate;
 
@@ -42,6 +45,7 @@ public class TemplateResponse extends BaseResponse {
                 .categoryId(template.getCategory().getCategoryId())
                 .categoryName(template.getCategory().getCategoryName())
                 .title(template.getTitle())
+                .variantLabel(template.getVariantLabel())
                 .subjectTemplate(template.getSubjectTemplate())
                 .bodyTemplate(template.getBodyTemplate())
                 .accuracyScore(template.getAccuracyScore())

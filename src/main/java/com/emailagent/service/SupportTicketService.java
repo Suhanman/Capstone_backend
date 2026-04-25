@@ -6,13 +6,18 @@ import com.emailagent.dto.request.support.SupportTicketRequest;
 import com.emailagent.dto.response.support.SupportTicketDetailResponse;
 import com.emailagent.dto.response.support.SupportTicketListResponse;
 import com.emailagent.exception.ResourceNotFoundException;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.SupportTicketRepository;
 import com.emailagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +25,7 @@ public class SupportTicketService {
 
     private final SupportTicketRepository supportTicketRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // =============================================
     // GET /api/support-tickets?status=
@@ -66,6 +72,17 @@ public class SupportTicketService {
                 .build(); // status 기본값 PENDING, adminReply null
 
         SupportTicket saved = supportTicketRepository.save(ticket);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ticket_id", saved.getTicketId());
+        payload.put("status", saved.getStatus());
+        payload.put("admin_reply_present", false);
+        payload.put(
+                "updated_at",
+                saved.getCreatedAt() != null ? saved.getCreatedAt().toInstant(ZoneOffset.UTC).toString() : null
+        );
+
+        eventPublisher.publishEvent(new SseEvent(this, userId, "support-ticket-updated", payload));
 
         return SupportTicketDetailResponse.CreateResponse.builder()
                 .ticketId(saved.getTicketId())

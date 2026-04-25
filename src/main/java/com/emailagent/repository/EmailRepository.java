@@ -26,6 +26,9 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
 
     Optional<Email> findByExternalMsgId(String externalMsgId);
 
+    @Query("SELECT e.user.userId FROM Email e WHERE e.emailId = :emailId")
+    Optional<Long> findUserIdByEmailId(@Param("emailId") Long emailId);
+
     // 분석 결과 포함 조회 (N+1 방지)
     @Query("SELECT e FROM Email e " +
            "LEFT JOIN FETCH e.user " +

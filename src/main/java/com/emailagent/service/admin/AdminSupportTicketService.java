@@ -5,8 +5,10 @@ import com.emailagent.dto.response.admin.support.AdminSupportTicketDetailRespons
 import com.emailagent.dto.response.admin.support.AdminSupportTicketListResponse;
 import com.emailagent.dto.response.admin.support.AdminSupportTicketReplyResponse;
 import com.emailagent.exception.ResourceNotFoundException;
+import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.SupportTicketRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -14,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +26,7 @@ import java.util.stream.Collectors;
 public class AdminSupportTicketService {
 
     private final SupportTicketRepository supportTicketRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 전체 문의 목록 조회 (status 필터, user_id 필터, 페이징)
@@ -95,6 +100,22 @@ public class AdminSupportTicketService {
                 .orElseThrow(() -> new ResourceNotFoundException("문의를 찾을 수 없습니다. ticketId=" + ticketId));
 
         ticket.registerAdminReply(adminReply, adminUserId);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("ticket_id", ticket.getTicketId());
+        payload.put("status", ticket.getStatus());
+        payload.put("admin_reply_present", ticket.getAdminReply() != null);
+        payload.put(
+                "updated_at",
+                ticket.getRepliedAt() != null ? ticket.getRepliedAt().toInstant(ZoneOffset.UTC).toString() : null
+        );
+
+        eventPublisher.publishEvent(new SseEvent(
+                this,
+                ticket.getUser().getUserId(),
+                "support-ticket-updated",
+                payload
+        ));
 
         return new AdminSupportTicketReplyResponse(ticket.getTicketId(), ticket.getStatus());
     }
