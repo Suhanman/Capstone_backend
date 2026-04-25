@@ -105,4 +105,9 @@ public class RagJob {
         this.payloadJson = payloadJson;
         this.completedAt = LocalDateTime.now();
     }
+
+    // COMPLETED 또는 FAILED 상태이면 true — 멱등성 가드에 사용
+    public boolean isTerminal() {
+        return this.status == RagJobStatus.COMPLETED || this.status == RagJobStatus.FAILED;
+    }
 }
