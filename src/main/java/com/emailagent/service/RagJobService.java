@@ -122,12 +122,8 @@ public class RagJobService {
 
     @Transactional
     public void completeKnowledgeIngest(RagKnowledgeIngestResultDTO result) {
-        // SELECT FOR UPDATE로 행 잠금 후 상태 전이
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
         RagJob job = getForUpdate(result.getJobId());
-        if (job.isTerminal()) {
-            log.warn("[RagJobService] completeKnowledgeIngest 중복 처리 감지 — 스킵: jobId={}, status={}", job.getJobId(), job.getStatus());
-            return;
-        }
 
         String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
@@ -144,11 +140,8 @@ public class RagJobService {
     public void completeTemplateIndex(String requestId, Long userId, RagTemplateIndexResultDTO result) {
         String jobId = "template-index-" + userId + "-" + requestId;
         // template-index job은 결과 수신 시점에 생성될 수 있으므로 getOrCreateForUpdate 사용
+        // result 메시지는 항상 최종 상태를 덮어쓴다
         RagJob job = getOrCreateForUpdate(jobId, userId, requestId, "templates.index", "template", null);
-        if (job.isTerminal()) {
-            log.warn("[RagJobService] completeTemplateIndex 중복 처리 감지 — 스킵: jobId={}, status={}", job.getJobId(), job.getStatus());
-            return;
-        }
 
         String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
@@ -163,12 +156,8 @@ public class RagJobService {
 
     @Transactional
     public void completeTemplateMatch(RagTemplateMatchResultDTO result) {
-        // SELECT FOR UPDATE로 행 잠금 후 상태 전이
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
         RagJob job = getForUpdate(result.getJobId());
-        if (job.isTerminal()) {
-            log.warn("[RagJobService] completeTemplateMatch 중복 처리 감지 — 스킵: jobId={}, status={}", job.getJobId(), job.getStatus());
-            return;
-        }
 
         String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
@@ -183,12 +172,8 @@ public class RagJobService {
 
     @Transactional
     public void completeDraftGeneration(RagDraftGenerateResultDTO result) {
-        // SELECT FOR UPDATE로 행 잠금 — 동시 progress 이벤트와의 경쟁 조건 방지
+        // SELECT FOR UPDATE로 행 잠금 — result 메시지는 항상 최종 상태를 덮어쓴다
         RagJob job = getForUpdate(result.getJobId());
-        if (job.isTerminal()) {
-            log.warn("[RagJobService] completeDraftGeneration 중복 처리 감지 — 스킵: jobId={}, status={}", job.getJobId(), job.getStatus());
-            return;
-        }
 
         String payloadJson = toJson(result.getPayload());
         if ("SUCCESS".equalsIgnoreCase(result.getStatus())) {
