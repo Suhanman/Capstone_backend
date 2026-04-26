@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.model.*;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +93,7 @@ public class PubSubHandlerService {
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
                     .setStartHistoryId(BigInteger.valueOf(startHistoryId))
+                    .setLabelId("INBOX")
                     .setHistoryTypes(List.of("messageAdded"))
                     .execute();
 
@@ -116,7 +118,7 @@ public class PubSubHandlerService {
             // 5. 각 메시지를 6단계 파이프라인으로 파싱하여 Email(attachments_meta 포함) + Outbox 저장
             int savedCount = 0;
             for (String messageId : messageIds) {
-                boolean saved = processMessage(gmailClient, user, messageId);
+                boolean saved = processMessage(gmailClient, user, integration.getConnectedEmail(), messageId);
                 if (saved) savedCount++;
             }
 
@@ -147,7 +149,7 @@ public class PubSubHandlerService {
      *
      * externalMsgId 중복 시 건너뛰고 false 반환.
      */
-    private boolean processMessage(Gmail gmailClient, User user, String messageId) throws Exception {
+    private boolean processMessage(Gmail gmailClient, User user, String connectedEmail, String messageId) throws Exception {
         // 중복 수신 방지 — Gmail historyId는 겹칠 수 있음
         if (emailRepository.existsByExternalMsgId(messageId)) {
             log.debug("[PubSub] 이미 처리된 메시지 — messageId={}", messageId);
@@ -155,10 +157,25 @@ public class PubSubHandlerService {
         }
 
         // 1~2단계: messages.get(format=full)로 전체 메시지 조회 후 헤더 추출
-        Message message = gmailClient.users().messages()
-                .get("me", messageId)
-                .setFormat("full")
-                .execute();
+        Message message;
+        try {
+            message = gmailClient.users().messages()
+                    .get("me", messageId)
+                    .setFormat("full")
+                    .execute();
+        } catch (GoogleJsonResponseException e) {
+            if (e.getStatusCode() == 404) {
+                log.warn("[PubSub] Gmail 메시지를 찾을 수 없어 건너뜀 — messageId={}", messageId);
+                return false;
+            }
+            throw e;
+        }
+
+        if (!isInboundInboxMessage(message, connectedEmail)) {
+            log.debug("[PubSub] 수신함 처리 대상이 아닌 메시지 건너뜀 — messageId={}, labels={}",
+                    messageId, message.getLabelIds());
+            return false;
+        }
 
         MessagePart payload = message.getPayload();
         Map<String, String> headers = EmailParsingUtil.parseHeaders(payload.getHeaders());
@@ -258,5 +275,31 @@ public class PubSubHandlerService {
         log.debug("[PubSub] 메시지 저장 완료 — messageId={}, subject={}, senderEmail={}, attachments={}건",
                 messageId, subject, senderEmail, attachmentParts.size());
         return true;
+    }
+
+    /**
+     * Gmail history에는 발송함/임시보관함/휴지통 등 수신 처리 대상이 아닌 이벤트가 섞일 수 있다.
+     * 저장 직전에 수신함에 남아 있는 외부 발신 메일만 통과시킨다.
+     */
+    private boolean isInboundInboxMessage(Message message, String connectedEmail) {
+        List<String> labelIds = message.getLabelIds();
+        if (labelIds == null || !labelIds.contains("INBOX")) {
+            return false;
+        }
+        if (labelIds.contains("SENT")
+                || labelIds.contains("DRAFT")
+                || labelIds.contains("TRASH")
+                || labelIds.contains("SPAM")) {
+            return false;
+        }
+
+        MessagePart payload = message.getPayload();
+        if (payload == null) {
+            return false;
+        }
+
+        Map<String, String> headers = EmailParsingUtil.parseHeaders(payload.getHeaders());
+        String senderEmail = EmailParsingUtil.extractSenderEmail(headers.getOrDefault("From", ""));
+        return connectedEmail == null || !connectedEmail.equalsIgnoreCase(senderEmail);
     }
 }
