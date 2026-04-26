@@ -15,6 +15,7 @@ import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.EmailTemplateRecommendationRepository;
 import com.emailagent.repository.TemplateRepository;
+import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -130,6 +132,10 @@ public class RagResultService {
 
                     String variantLabel = template.getVariantLabel() != null ? template.getVariantLabel() : "일반형";
                     String templatePurpose = generated != null ? generated.getTemplatePurpose() : null;
+                    List<String> semanticKeywords = new ArrayList<>();
+                    semanticKeywords.add(category.getCategoryName());
+                    semanticKeywords.add(variantLabel);
+                    semanticKeywords.addAll(CategoryKeywordDefaults.resolve(category.getCategoryName(), category.getKeywords()));
                     return RagTemplateIndexRequestDTO.TemplateItem.builder()
                             .templateId(template.getTemplateId())
                             .title(template.getTitle())
@@ -139,7 +145,7 @@ public class RagResultService {
                                     RagTemplateIndexRequestDTO.Metadata.builder()
                                             .templatePurpose(templatePurpose)
                                             .searchSummary(variantLabel + " 템플릿")
-                                            .semanticKeywords(List.of(category.getCategoryName(), variantLabel))
+                                            .semanticKeywords(CategoryKeywordDefaults.normalize(semanticKeywords))
                                             .recommendedSituations(templatePurpose != null ? List.of(templatePurpose) : List.of())
                                             .build()
                             )

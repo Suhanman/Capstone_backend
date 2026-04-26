@@ -8,6 +8,8 @@ import com.emailagent.dto.response.admin.category.AdminCategoryKeywordItemRespon
 import com.emailagent.dto.response.admin.category.AdminCategoryKeywordListResponse;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.CategoryRepository;
+import com.emailagent.service.RagTemplateIndexService;
+import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ import java.util.Objects;
 public class AdminCategoryKeywordService {
 
     private final CategoryRepository categoryRepository;
+    private final RagTemplateIndexService ragTemplateIndexService;
 
     @Transactional(readOnly = true)
     public AdminCategoryKeywordListResponse getCategories() {
@@ -37,6 +40,7 @@ public class AdminCategoryKeywordService {
         String categoryName = normalizeRequired(request.getCategoryName(), "카테고리명은 필수입니다.");
         List<Category> categories = findCategoriesByName(categoryName);
         updateKeywordRows(categories, request.getColor(), request.getKeywords());
+        ragTemplateIndexService.reindexCategories(categories);
         return toGroupedResponse(categoryName, categories);
     }
 
@@ -48,6 +52,7 @@ public class AdminCategoryKeywordService {
         String normalizedCategoryName = normalizeRequired(categoryName, "카테고리명은 필수입니다.");
         List<Category> categories = findCategoriesByName(normalizedCategoryName);
         updateKeywordRows(categories, request.getColor(), request.getKeywords());
+        ragTemplateIndexService.reindexCategories(categories);
         return toGroupedResponse(normalizedCategoryName, categories);
     }
 
@@ -55,6 +60,7 @@ public class AdminCategoryKeywordService {
     public AdminSimpleResponse clearCategoryKeywords(String categoryName) {
         List<Category> categories = findCategoriesByName(normalizeRequired(categoryName, "카테고리명은 필수입니다."));
         categories.forEach(category -> category.updateKeywordsByAdmin(category.getColor(), List.of()));
+        ragTemplateIndexService.reindexCategories(categories);
         return AdminSimpleResponse.OK;
     }
 
@@ -87,7 +93,7 @@ public class AdminCategoryKeywordService {
         return new AdminCategoryKeywordItemResponse(
                 categoryName,
                 resolveColor(categories),
-                mergeKeywords(categories),
+                mergeKeywords(categoryName, categories),
                 categories.size(),
                 (int) categories.stream()
                         .map(category -> category.getUser().getUserId())
@@ -106,7 +112,7 @@ public class AdminCategoryKeywordService {
                 .orElse(null);
     }
 
-    private List<String> mergeKeywords(List<Category> categories) {
+    private List<String> mergeKeywords(String categoryName, List<Category> categories) {
         LinkedHashSet<String> mergedKeywords = new LinkedHashSet<>();
         categories.forEach(category -> category.getKeywords().forEach(keyword -> {
             String normalized = normalizeOptional(keyword);
@@ -114,7 +120,7 @@ public class AdminCategoryKeywordService {
                 mergedKeywords.add(normalized);
             }
         }));
-        return new ArrayList<>(mergedKeywords);
+        return CategoryKeywordDefaults.resolve(categoryName, new ArrayList<>(mergedKeywords));
     }
 
     private String normalizeRequired(String value, String message) {

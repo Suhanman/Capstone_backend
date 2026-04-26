@@ -5,6 +5,7 @@ import com.emailagent.dto.request.business.*;
 import com.emailagent.dto.response.business.*;
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.*;
+import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -210,7 +211,7 @@ public class BusinessService {
                 .user(user)
                 .categoryName(request.getCategoryName())
                 .color(request.getColor())
-                .keywords(request.getKeywords())
+                .keywords(CategoryKeywordDefaults.resolve(request.getCategoryName(), request.getKeywords()))
                 .build();
 
         return CategoryResponse.from(categoryRepository.save(category));
