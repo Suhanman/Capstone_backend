@@ -247,9 +247,6 @@ public class InboxService {
                 );
                 email.updateStatus(EmailStatus.PROCESSED);
                 draft.updateStatus(DraftStatus.SENT);
-                if (draft.getTemplate() != null) {
-                    draft.getTemplate().incrementUseCount();
-                }
                 yield "답장이 발송되었습니다.";
             }
             case "EDIT_SEND" -> {
@@ -265,9 +262,6 @@ public class InboxService {
                 );
                 email.updateStatus(EmailStatus.PROCESSED);
                 draft.updateStatus(DraftStatus.EDITED);
-                if (draft.getTemplate() != null) {
-                    draft.getTemplate().incrementUseCount();
-                }
                 yield "수정된 답장이 발송되었습니다.";
             }
             case "SKIP" -> {
