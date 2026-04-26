@@ -9,7 +9,6 @@ import com.emailagent.dto.response.admin.category.AdminCategoryKeywordListRespon
 import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.service.RagTemplateIndexService;
-import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -120,7 +119,7 @@ public class AdminCategoryKeywordService {
                 mergedKeywords.add(normalized);
             }
         }));
-        return CategoryKeywordDefaults.resolve(categoryName, new ArrayList<>(mergedKeywords));
+        return new ArrayList<>(mergedKeywords);
     }
 
     private String normalizeRequired(String value, String message) {

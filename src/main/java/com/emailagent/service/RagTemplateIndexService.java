@@ -6,7 +6,6 @@ import com.emailagent.rabbitmq.dto.RagTemplateIndexRequestDTO;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
 import com.emailagent.repository.BusinessProfileRepository;
 import com.emailagent.repository.TemplateRepository;
-import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -62,7 +61,7 @@ public class RagTemplateIndexService {
         List<String> semanticKeywords = new ArrayList<>();
         semanticKeywords.add(category.getCategoryName());
         semanticKeywords.add(variantLabel);
-        semanticKeywords.addAll(CategoryKeywordDefaults.resolve(category.getCategoryName(), category.getKeywords()));
+        semanticKeywords.addAll(category.getKeywords());
 
         return RagTemplateIndexRequestDTO.TemplateItem.builder()
                 .templateId(template.getTemplateId())
@@ -71,9 +70,17 @@ public class RagTemplateIndexService {
                 .emailTone(emailTone)
                 .metadata(RagTemplateIndexRequestDTO.Metadata.builder()
                         .searchSummary(variantLabel + " 템플릿")
-                        .semanticKeywords(CategoryKeywordDefaults.normalize(semanticKeywords))
+                        .semanticKeywords(normalizeKeywords(semanticKeywords))
                         .recommendedSituations(List.of())
                         .build())
                 .build();
+    }
+
+    private List<String> normalizeKeywords(List<String> keywords) {
+        return keywords.stream()
+                .filter(keyword -> keyword != null && !keyword.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 }
