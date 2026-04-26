@@ -78,6 +78,13 @@ public class RagResultService {
 
         publishTemplateIndex(savedTemplates, category, items);
 
+        // 같은 category_name을 공유하는 모든 템플릿의 user_count 갱신
+        templateRepository.findUserCountPerTemplate().forEach(row -> {
+            Long templateId = ((Number) row[0]).longValue();
+            int count = ((Number) row[1]).intValue();
+            templateRepository.findById(templateId).ifPresent(t -> t.updateUserCount(count));
+        });
+
         log.info(
                 "[RagResultService] draft 결과로 템플릿 저장 완료 — userId={}, categoryId={}, count={}",
                 userId,
