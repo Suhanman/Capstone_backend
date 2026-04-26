@@ -78,6 +78,14 @@ public class Template {
         this.bodyTemplate = bodyTemplate;
     }
 
+    public void incrementUseCount() {
+        this.useCount = (this.useCount == null ? 0 : this.useCount) + 1;
+    }
+
+    public void updateUserCount(int count) {
+        this.userCount = count;
+    }
+
     public void updateAccuracyScore(BigDecimal score) {
         this.accuracyScore = score;
     }
