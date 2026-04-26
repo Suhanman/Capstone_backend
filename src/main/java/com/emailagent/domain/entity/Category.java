@@ -50,4 +50,9 @@ public class Category {
     public List<String> getKeywords() {
         return keywords == null ? Collections.emptyList() : keywords;
     }
+
+    public void updateKeywordsByAdmin(String color, List<String> keywords) {
+        this.color = color;
+        this.keywords = keywords == null ? new ArrayList<>() : new ArrayList<>(keywords);
+    }
 }
