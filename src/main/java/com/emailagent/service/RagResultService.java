@@ -15,7 +15,6 @@ import com.emailagent.repository.CategoryRepository;
 import com.emailagent.repository.EmailRepository;
 import com.emailagent.repository.EmailTemplateRecommendationRepository;
 import com.emailagent.repository.TemplateRepository;
-import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -135,7 +134,7 @@ public class RagResultService {
                     List<String> semanticKeywords = new ArrayList<>();
                     semanticKeywords.add(category.getCategoryName());
                     semanticKeywords.add(variantLabel);
-                    semanticKeywords.addAll(CategoryKeywordDefaults.resolve(category.getCategoryName(), category.getKeywords()));
+                    semanticKeywords.addAll(category.getKeywords());
                     return RagTemplateIndexRequestDTO.TemplateItem.builder()
                             .templateId(template.getTemplateId())
                             .title(template.getTitle())
@@ -145,7 +144,7 @@ public class RagResultService {
                                     RagTemplateIndexRequestDTO.Metadata.builder()
                                             .templatePurpose(templatePurpose)
                                             .searchSummary(variantLabel + " 템플릿")
-                                            .semanticKeywords(CategoryKeywordDefaults.normalize(semanticKeywords))
+                                            .semanticKeywords(normalizeKeywords(semanticKeywords))
                                             .recommendedSituations(templatePurpose != null ? List.of(templatePurpose) : List.of())
                                             .build()
                             )
@@ -164,6 +163,14 @@ public class RagResultService {
                 .build();
 
         ragPublisher.publishTemplateIndex(message);
+    }
+
+    private List<String> normalizeKeywords(List<String> keywords) {
+        return keywords.stream()
+                .filter(keyword -> keyword != null && !keyword.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     @Transactional

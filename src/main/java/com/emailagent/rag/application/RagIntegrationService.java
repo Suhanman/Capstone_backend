@@ -11,7 +11,6 @@ import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
 import com.emailagent.service.S3Service;
-import com.emailagent.util.CategoryKeywordDefaults;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -135,7 +134,7 @@ public class RagIntegrationService {
                 .mode("generate")
                 .categoryId(category.getCategoryId())
                 .categoryName(category.getCategoryName())
-                .categoryKeywords(CategoryKeywordDefaults.resolve(category.getCategoryName(), category.getKeywords()))
+                .categoryKeywords(category.getKeywords())
                 .industryType(request.getIndustryType())
                 .emailTone(request.getEmailTone())
                 .companyDescription(request.getCompanyDescription())
