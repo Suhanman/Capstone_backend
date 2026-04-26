@@ -7,6 +7,7 @@ import com.emailagent.dto.request.admin.AdminCategoryKeywordUpdateRequest;
 import com.emailagent.dto.response.admin.AdminSimpleResponse;
 import com.emailagent.dto.response.admin.category.AdminCategoryKeywordItemResponse;
 import com.emailagent.dto.response.admin.category.AdminCategoryKeywordListResponse;
+import com.emailagent.exception.ResourceNotFoundException;
 import com.emailagent.repository.CategoryKeywordRuleRepository;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.service.RagTemplateIndexService;
@@ -37,8 +38,9 @@ public class AdminCategoryKeywordService {
     @Transactional
     public AdminCategoryKeywordItemResponse saveCategoryKeywords(AdminCategoryKeywordCreateRequest request) {
         String categoryName = normalizeRequired(request.getCategoryName(), "카테고리명은 필수입니다.");
-        CategoryKeywordRule rule = saveRule(categoryName, request.getColor(), request.getKeywords());
         List<Category> categories = categoryRepository.findAllByCategoryNameWithUser(categoryName);
+        ensureKnownCategory(categoryName, categories);
+        CategoryKeywordRule rule = saveRule(categoryName, request.getColor(), request.getKeywords());
         ragTemplateIndexService.reindexCategories(categories);
         return toGroupedResponse(categoryName, rule, categories);
     }
@@ -72,6 +74,13 @@ public class AdminCategoryKeywordService {
                         .build());
         rule.update(normalizeOptional(color), normalizeKeywords(keywords));
         return keywordRuleRepository.save(rule);
+    }
+
+    private void ensureKnownCategory(String categoryName, List<Category> categories) {
+        if (!categories.isEmpty() || keywordRuleRepository.findByCategoryName(categoryName).isPresent()) {
+            return;
+        }
+        throw new ResourceNotFoundException("등록된 운영 카테고리를 찾을 수 없습니다. categoryName=" + categoryName);
     }
 
     private List<AdminCategoryKeywordItemResponse> toGroupedResponses() {
