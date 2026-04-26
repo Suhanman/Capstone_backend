@@ -21,9 +21,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -40,6 +39,7 @@ public class RagResultService {
     private final EmailRepository emailRepository;
     private final EmailTemplateRecommendationRepository recommendationRepository;
     private final TemplateNumberService templateNumberService;
+    private final RagTemplateIndexService ragTemplateIndexService;
     private final RagPublisher ragPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -138,10 +138,6 @@ public class RagResultService {
 
                     String variantLabel = template.getVariantLabel() != null ? template.getVariantLabel() : "일반형";
                     String templatePurpose = generated != null ? generated.getTemplatePurpose() : null;
-                    List<String> semanticKeywords = new ArrayList<>();
-                    semanticKeywords.add(category.getCategoryName());
-                    semanticKeywords.add(variantLabel);
-                    semanticKeywords.addAll(category.getKeywords());
                     return RagTemplateIndexRequestDTO.TemplateItem.builder()
                             .templateId(template.getTemplateId())
                             .title(template.getTitle())
@@ -151,7 +147,7 @@ public class RagResultService {
                                     RagTemplateIndexRequestDTO.Metadata.builder()
                                             .templatePurpose(templatePurpose)
                                             .searchSummary(variantLabel + " 템플릿")
-                                            .semanticKeywords(normalizeKeywords(semanticKeywords))
+                                            .semanticKeywords(ragTemplateIndexService.toSemanticKeywords(category, variantLabel))
                                             .recommendedSituations(templatePurpose != null ? List.of(templatePurpose) : List.of())
                                             .build()
                             )
@@ -170,14 +166,6 @@ public class RagResultService {
                 .build();
 
         ragPublisher.publishTemplateIndex(message);
-    }
-
-    private List<String> normalizeKeywords(List<String> keywords) {
-        return keywords.stream()
-                .filter(keyword -> keyword != null && !keyword.trim().isEmpty())
-                .map(String::trim)
-                .distinct()
-                .toList();
     }
 
     @Transactional

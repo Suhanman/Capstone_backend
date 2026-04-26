@@ -117,7 +117,6 @@ CREATE TABLE categories (
     user_id BIGINT NOT NULL, -- 사용자 ID
     category_name VARCHAR(100) NOT NULL, -- 카테고리명
     color VARCHAR(30), -- 표시 색상
-    keywords TEXT NULL, -- 카테고리별 검색 키워드(JSON 배열)
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
 
@@ -126,6 +125,24 @@ CREATE TABLE categories (
     CONSTRAINT fk_categories_user
         FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE
+);
+```
+
+# 6-1. category_keyword_rules
+
+RAG 템플릿 생성/검색에 사용할 **전역 카테고리별 검색 키워드 규칙**을 저장하는 테이블
+
+`categories`는 사용자별 카테고리이고, 이 테이블은 관리자 화면에서 수정하는 운영 규칙이다.
+
+```sql
+CREATE TABLE category_keyword_rules (
+    rule_id BIGINT AUTO_INCREMENT PRIMARY KEY, -- 운영 규칙 ID
+    category_name VARCHAR(100) NOT NULL UNIQUE, -- 적용할 카테고리명
+    color VARCHAR(30) NULL, -- 관리자 UI 표시 색상
+    keywords TEXT NULL, -- RAG 검색용 키워드(JSON 배열)
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 생성 일시
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- 수정 일시
 );
 ```
 

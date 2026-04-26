@@ -1,12 +1,13 @@
 package com.emailagent.service.admin;
 
 import com.emailagent.domain.entity.Category;
+import com.emailagent.domain.entity.CategoryKeywordRule;
 import com.emailagent.dto.request.admin.AdminCategoryKeywordCreateRequest;
 import com.emailagent.dto.request.admin.AdminCategoryKeywordUpdateRequest;
 import com.emailagent.dto.response.admin.AdminSimpleResponse;
 import com.emailagent.dto.response.admin.category.AdminCategoryKeywordItemResponse;
 import com.emailagent.dto.response.admin.category.AdminCategoryKeywordListResponse;
-import com.emailagent.exception.ResourceNotFoundException;
+import com.emailagent.repository.CategoryKeywordRuleRepository;
 import com.emailagent.repository.CategoryRepository;
 import com.emailagent.service.RagTemplateIndexService;
 import lombok.RequiredArgsConstructor;
@@ -25,22 +26,21 @@ import java.util.Objects;
 public class AdminCategoryKeywordService {
 
     private final CategoryRepository categoryRepository;
+    private final CategoryKeywordRuleRepository keywordRuleRepository;
     private final RagTemplateIndexService ragTemplateIndexService;
 
     @Transactional(readOnly = true)
     public AdminCategoryKeywordListResponse getCategories() {
-        return new AdminCategoryKeywordListResponse(toGroupedResponses(
-                categoryRepository.findAllWithUserOrderByCategoryNameAndUserId()
-        ));
+        return new AdminCategoryKeywordListResponse(toGroupedResponses());
     }
 
     @Transactional
     public AdminCategoryKeywordItemResponse saveCategoryKeywords(AdminCategoryKeywordCreateRequest request) {
         String categoryName = normalizeRequired(request.getCategoryName(), "카테고리명은 필수입니다.");
-        List<Category> categories = findCategoriesByName(categoryName);
-        updateKeywordRows(categories, request.getColor(), request.getKeywords());
+        CategoryKeywordRule rule = saveRule(categoryName, request.getColor(), request.getKeywords());
+        List<Category> categories = categoryRepository.findAllByCategoryNameWithUser(categoryName);
         ragTemplateIndexService.reindexCategories(categories);
-        return toGroupedResponse(categoryName, categories);
+        return toGroupedResponse(categoryName, rule, categories);
     }
 
     @Transactional
@@ -49,50 +49,73 @@ public class AdminCategoryKeywordService {
             AdminCategoryKeywordUpdateRequest request
     ) {
         String normalizedCategoryName = normalizeRequired(categoryName, "카테고리명은 필수입니다.");
-        List<Category> categories = findCategoriesByName(normalizedCategoryName);
-        updateKeywordRows(categories, request.getColor(), request.getKeywords());
+        CategoryKeywordRule rule = saveRule(normalizedCategoryName, request.getColor(), request.getKeywords());
+        List<Category> categories = categoryRepository.findAllByCategoryNameWithUser(normalizedCategoryName);
         ragTemplateIndexService.reindexCategories(categories);
-        return toGroupedResponse(normalizedCategoryName, categories);
+        return toGroupedResponse(normalizedCategoryName, rule, categories);
     }
 
     @Transactional
     public AdminSimpleResponse clearCategoryKeywords(String categoryName) {
-        List<Category> categories = findCategoriesByName(normalizeRequired(categoryName, "카테고리명은 필수입니다."));
-        categories.forEach(category -> category.updateKeywordsByAdmin(category.getColor(), List.of()));
+        String normalizedCategoryName = normalizeRequired(categoryName, "카테고리명은 필수입니다.");
+        keywordRuleRepository.findByCategoryName(normalizedCategoryName)
+                .ifPresent(keywordRuleRepository::delete);
+        List<Category> categories = categoryRepository.findAllByCategoryNameWithUser(normalizedCategoryName);
         ragTemplateIndexService.reindexCategories(categories);
         return AdminSimpleResponse.OK;
     }
 
-    private List<Category> findCategoriesByName(String categoryName) {
-        List<Category> categories = categoryRepository.findAllByCategoryNameWithUser(categoryName);
-        if (categories.isEmpty()) {
-            throw new ResourceNotFoundException("카테고리를 찾을 수 없습니다. categoryName=" + categoryName);
-        }
-        return categories;
+    private CategoryKeywordRule saveRule(String categoryName, String color, List<String> keywords) {
+        CategoryKeywordRule rule = keywordRuleRepository.findByCategoryName(categoryName)
+                .orElseGet(() -> CategoryKeywordRule.builder()
+                        .categoryName(categoryName)
+                        .build());
+        rule.update(normalizeOptional(color), normalizeKeywords(keywords));
+        return keywordRuleRepository.save(rule);
     }
 
-    private void updateKeywordRows(List<Category> categories, String color, List<String> keywords) {
-        String normalizedColor = normalizeOptional(color);
-        List<String> normalizedKeywords = normalizeKeywords(keywords);
-        categories.forEach(category -> category.updateKeywordsByAdmin(normalizedColor, normalizedKeywords));
+    private List<AdminCategoryKeywordItemResponse> toGroupedResponses() {
+        Map<String, List<Category>> categoriesByName = groupCategories(
+                categoryRepository.findAllWithUserOrderByCategoryNameAndUserId()
+        );
+        Map<String, CategoryKeywordRule> rulesByName = groupRules(keywordRuleRepository.findAllByOrderByCategoryNameAsc());
+
+        LinkedHashSet<String> categoryNames = new LinkedHashSet<>();
+        categoryNames.addAll(rulesByName.keySet());
+        categoryNames.addAll(categoriesByName.keySet());
+
+        return categoryNames.stream()
+                .map(categoryName -> toGroupedResponse(
+                        categoryName,
+                        rulesByName.get(categoryName),
+                        categoriesByName.getOrDefault(categoryName, List.of())
+                ))
+                .toList();
     }
 
-    private List<AdminCategoryKeywordItemResponse> toGroupedResponses(List<Category> categories) {
+    private Map<String, List<Category>> groupCategories(List<Category> categories) {
         Map<String, List<Category>> grouped = new LinkedHashMap<>();
         categories.forEach(category ->
                 grouped.computeIfAbsent(category.getCategoryName(), ignored -> new ArrayList<>()).add(category)
         );
-
-        return grouped.entrySet().stream()
-                .map(entry -> toGroupedResponse(entry.getKey(), entry.getValue()))
-                .toList();
+        return grouped;
     }
 
-    private AdminCategoryKeywordItemResponse toGroupedResponse(String categoryName, List<Category> categories) {
+    private Map<String, CategoryKeywordRule> groupRules(List<CategoryKeywordRule> rules) {
+        Map<String, CategoryKeywordRule> grouped = new LinkedHashMap<>();
+        rules.forEach(rule -> grouped.put(rule.getCategoryName(), rule));
+        return grouped;
+    }
+
+    private AdminCategoryKeywordItemResponse toGroupedResponse(
+            String categoryName,
+            CategoryKeywordRule rule,
+            List<Category> categories
+    ) {
         return new AdminCategoryKeywordItemResponse(
                 categoryName,
-                resolveColor(categories),
-                mergeKeywords(categoryName, categories),
+                resolveColor(rule, categories),
+                rule != null ? rule.getKeywords() : List.of(),
                 categories.size(),
                 (int) categories.stream()
                         .map(category -> category.getUser().getUserId())
@@ -102,24 +125,20 @@ public class AdminCategoryKeywordService {
         );
     }
 
-    private String resolveColor(List<Category> categories) {
+    private String resolveColor(CategoryKeywordRule rule, List<Category> categories) {
+        if (rule != null) {
+            String ruleColor = normalizeOptional(rule.getColor());
+            if (ruleColor != null) {
+                return ruleColor;
+            }
+        }
+
         return categories.stream()
                 .map(Category::getColor)
                 .map(this::normalizeOptional)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
-    }
-
-    private List<String> mergeKeywords(String categoryName, List<Category> categories) {
-        LinkedHashSet<String> mergedKeywords = new LinkedHashSet<>();
-        categories.forEach(category -> category.getKeywords().forEach(keyword -> {
-            String normalized = normalizeOptional(keyword);
-            if (normalized != null) {
-                mergedKeywords.add(normalized);
-            }
-        }));
-        return new ArrayList<>(mergedKeywords);
     }
 
     private String normalizeRequired(String value, String message) {
