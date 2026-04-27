@@ -4,6 +4,8 @@ import com.emailagent.domain.entity.Email;
 import com.emailagent.domain.entity.Integration;
 import com.emailagent.domain.entity.Outbox;
 import com.emailagent.domain.entity.User;
+import com.emailagent.domain.enums.EmailStatus;
+import com.emailagent.domain.enums.OutboxStatus;
 import com.emailagent.dto.inbox.AttachmentMetaDto;
 import com.emailagent.rabbitmq.event.SseEvent;
 import com.emailagent.repository.EmailRepository;
@@ -34,11 +36,14 @@ import java.util.*;
  * Google Pub/Sub Push 알림의 비동기 처리 서비스.
  * WebhookController가 200 OK를 즉시 반환한 뒤 이 서비스가 별도 스레드에서 실행된다.
  *
- * 처리 흐름 (6단계 파이프라인):
- * 1~2단계: messages.get(format=full) 조회 → headers(From/To/Subject/Date 등) 추출
- * 3~4단계: 본문 파트 재귀 탐색 → text/plain 우선, 없으면 text/html → Base64URL 디코딩
- * 5단계:   Jsoup HTML 제거 + 서명·인용문 제거 + 공백 정규화
- * 6단계:   AI 서버 전송 규격 JSON으로 payload 구성 → Email(attachments_meta 포함) 저장 → Outbox(READY) 저장
+ * 처리하는 Gmail History 이벤트 유형:
+ * - messageAdded   : 신규 메일 수신 → 6단계 파싱 파이프라인 후 Email + Outbox(READY) 저장
+ * - labelsAdded    : INBOX 라벨 복구(휴지통 → 받은편지함) → Email 상태를 PENDING_REVIEW로 복원
+ * - labelsRemoved  : INBOX 라벨 제거(받은편지함 → 휴지통) → 소프트 삭제 (Email: DELETED, Outbox: CANCELLED)
+ * - messagesDeleted: Gmail에서 영구 삭제 → 소프트 삭제 (동일)
+ *
+ * 성능 최적화: setLabelId 제거 대신 Java 레이어에서 INBOX 라벨 여부를 먼저 검사하여
+ *             불필요한 DB 조회를 최소화한다.
  */
 @Slf4j
 @Service
@@ -90,49 +95,76 @@ public class PubSubHandlerService {
                 startHistoryId = historyId - 1;
             }
 
+            // 4. Gmail History API 호출
+            //    setLabelId 제거: labelsRemoved/labelsAdded 이벤트는 INBOX 라벨이 이미 제거된 후라
+            //    labelId 필터 적용 시 해당 이벤트가 응답에서 누락될 수 있다.
+            //    대신 Java 레이어에서 INBOX 라벨 포함 여부를 먼저 검사해 불필요한 DB 조회를 차단한다.
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
                     .setStartHistoryId(BigInteger.valueOf(startHistoryId))
-                    .setLabelId("INBOX")
-                    .setHistoryTypes(List.of("messageAdded"))
+                    .setHistoryTypes(List.of("messageAdded", "labelsAdded", "labelsRemoved", "messagesDeleted"))
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
-                log.debug("[PubSub] 신규 메시지 없음 — startHistoryId={}, pubsubHistoryId={}, emailAddress={}",
+                log.debug("[PubSub] 처리할 이력 없음 — startHistoryId={}, pubsubHistoryId={}, emailAddress={}",
                         startHistoryId, historyId, emailAddress);
-                // 메시지 없어도 기준점은 갱신 (다음 알림을 위해)
                 integration.updateLastHistoryId(historyId);
                 return;
             }
 
-            // 4. 신규 메시지 ID 수집 (LinkedHashSet으로 순서 유지 및 중복 제거)
-            Set<String> messageIds = new LinkedHashSet<>();
+            // 5. 이벤트 유형별 처리
+            int savedCount = 0;
             for (History history : historyResponse.getHistory()) {
+
+                // ① 신규 메시지 수신 — 6단계 파이프라인으로 Email + Outbox 저장
                 if (history.getMessagesAdded() != null) {
                     for (HistoryMessageAdded added : history.getMessagesAdded()) {
-                        messageIds.add(added.getMessage().getId());
+                        boolean saved = processMessage(gmailClient, user,
+                                integration.getConnectedEmail(), added.getMessage().getId());
+                        if (saved) savedCount++;
+                    }
+                }
+
+                // ② 라벨 추가 — INBOX 복구(휴지통 → 받은편지함) 시 이메일 상태 복원
+                if (history.getLabelsAdded() != null) {
+                    for (HistoryLabelAdded added : history.getLabelsAdded()) {
+                        // 【성능 필터】INBOX 라벨이 추가된 경우가 아니면 DB 조회 없이 즉시 건너뜀
+                        if (added.getLabelIds() == null || !added.getLabelIds().contains("INBOX")) {
+                            continue;
+                        }
+                        restoreEmail(added.getMessage().getId());
+                    }
+                }
+
+                // ③ 라벨 제거 — INBOX 이탈(받은편지함 → 휴지통) 시 소프트 삭제
+                if (history.getLabelsRemoved() != null) {
+                    for (HistoryLabelRemoved removed : history.getLabelsRemoved()) {
+                        // 【성능 필터】INBOX 라벨이 제거된 경우가 아니면 DB 조회 없이 즉시 건너뜀
+                        if (removed.getLabelIds() == null || !removed.getLabelIds().contains("INBOX")) {
+                            continue;
+                        }
+                        softDeleteEmail(removed.getMessage().getId());
+                    }
+                }
+
+                // ④ 메시지 영구 삭제 — 소프트 삭제 (labelsRemoved와 공통 처리)
+                if (history.getMessagesDeleted() != null) {
+                    for (HistoryMessageDeleted deleted : history.getMessagesDeleted()) {
+                        softDeleteEmail(deleted.getMessage().getId());
                     }
                 }
             }
 
-            // 5. 각 메시지를 6단계 파이프라인으로 파싱하여 Email(attachments_meta 포함) + Outbox 저장
-            int savedCount = 0;
-            for (String messageId : messageIds) {
-                boolean saved = processMessage(gmailClient, user, integration.getConnectedEmail(), messageId);
-                if (saved) savedCount++;
-            }
-
-            // 처리 완료 후 lastHistoryId 갱신 — 다음 Pub/Sub 알림의 startHistoryId 기준점
+            // 6. 기준점 갱신 — 다음 Pub/Sub 알림의 startHistoryId로 사용
             integration.updateLastHistoryId(historyId);
 
-            // 1건 이상 저장된 경우 SSE Hub에 알림 (트랜잭션 커밋 후 x.sse.fanout publish)
-            // 복수 메시지가 동시에 저장되어도 신호는 1회면 충분 (클라이언트가 목록 재조회)
+            // 신규 수신 메시지가 있을 때만 SSE 알림 발행 (삭제/복구는 알림 불필요)
             if (savedCount > 0) {
                 eventPublisher.publishEvent(new SseEvent(this, user.getUserId(), "pub/sub"));
             }
 
-            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}/{}건, lastHistoryId={}",
-                    emailAddress, savedCount, messageIds.size(), historyId);
+            log.debug("[PubSub] 처리 완료 — emailAddress={}, 신규 저장={}건, lastHistoryId={}",
+                    emailAddress, savedCount, historyId);
 
         } catch (Exception e) {
             // @Async 스레드 내 예외는 전역 핸들러가 잡지 못하므로 여기서 반드시 기록
@@ -276,6 +308,54 @@ public class PubSubHandlerService {
                 messageId, subject, senderEmail, attachmentParts.size());
         return true;
     }
+
+    // ── 소프트 삭제 / 복구 공통 메서드 ──────────────────────────────────────────
+
+    /**
+     * 소프트 삭제 — labelsRemoved(INBOX 이탈)와 messagesDeleted(영구 삭제) 공용.
+     *
+     * DB에 존재하지 않는 messageId는 ifPresent가 실행되지 않으므로,
+     * SENT/DRAFT 등 우리가 저장하지 않은 메시지의 삭제 이벤트를 자연스럽게 걸러낸다.
+     * 이미 DELETED인 경우 return으로 멱등성을 보장하여 labelsRemoved + messagesDeleted
+     * 이중 이벤트가 발생해도 중복 처리되지 않는다.
+     */
+    private void softDeleteEmail(String messageId) {
+        emailRepository.findByExternalMsgId(messageId).ifPresent(email -> {
+            if (email.getStatus() == EmailStatus.DELETED) {
+                log.debug("[PubSub] 이미 삭제된 이메일 — messageId={}", messageId);
+                return;
+            }
+            email.updateStatus(EmailStatus.DELETED);
+
+            // 진행 중인 Outbox를 CANCELLED로 처리
+            // fail_reason에 "DELETED_BY_USER"를 기록하여 AI 오류(FAILED)와 원인을 명확히 구분한다.
+            List<Outbox> activeOutboxes = outboxRepository.findByEmail_EmailIdAndStatusIn(
+                    email.getEmailId(), List.of(OutboxStatus.READY, OutboxStatus.SENDING));
+            activeOutboxes.forEach(o -> o.markAsCancelled("DELETED_BY_USER"));
+
+            log.info("[PubSub] 이메일 소프트 삭제 완료 — messageId={}, cancelledOutbox={}건",
+                    messageId, activeOutboxes.size());
+        });
+    }
+
+    /**
+     * 이메일 복구 — labelsAdded로 INBOX 라벨이 재추가될 때 호출.
+     * DELETED 상태인 경우에만 PENDING_REVIEW로 복원하고, 그 외 상태는 무시하여 멱등성을 보장한다.
+     * 복구 시 이전 처리 상태(PROCESSED/AUTO_SENT)를 알 수 없으므로 PENDING_REVIEW로 초기화한다.
+     */
+    private void restoreEmail(String messageId) {
+        emailRepository.findByExternalMsgId(messageId).ifPresent(email -> {
+            if (email.getStatus() != EmailStatus.DELETED) {
+                // DELETED가 아닌 상태에서 INBOX 라벨이 추가되는 정상 수신 흐름 등 — 무시
+                log.debug("[PubSub] 복구 대상 아님 — messageId={}, currentStatus={}", messageId, email.getStatus());
+                return;
+            }
+            email.updateStatus(EmailStatus.PENDING_REVIEW);
+            log.info("[PubSub] 이메일 복구 완료 — messageId={}", messageId);
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * Gmail history에는 발송함/임시보관함/휴지통 등 수신 처리 대상이 아닌 이벤트가 섞일 수 있다.

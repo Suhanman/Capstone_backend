@@ -36,25 +36,26 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
     Optional<Email> findByEmailIdAndUserId(@Param("emailId") Long emailId,
                                             @Param("userId") Long userId);
 
-    // 특정 기간 이메일 수 카운트 (대시보드용)
-    @Query("SELECT COUNT(e) FROM Email e WHERE e.user.userId = :userId AND e.receivedAt >= :start AND e.receivedAt < :end")
+    // 특정 기간 이메일 수 카운트 (대시보드용) — DELETED 제외
+    @Query("SELECT COUNT(e) FROM Email e WHERE e.user.userId = :userId AND e.receivedAt >= :start AND e.receivedAt < :end AND e.status != com.emailagent.domain.enums.EmailStatus.DELETED")
     long countByUserIdAndDateRange(@Param("userId") Long userId,
                                    @Param("start") LocalDateTime start,
                                    @Param("end") LocalDateTime end);
 
-    // 최근 이메일 N건 (대시보드용, N+1 방지)
-    @Query("SELECT e FROM Email e WHERE e.user.userId = :userId ORDER BY e.receivedAt DESC")
+    // 최근 이메일 N건 (대시보드용, N+1 방지) — DELETED 제외
+    @Query("SELECT e FROM Email e WHERE e.user.userId = :userId AND e.status != com.emailagent.domain.enums.EmailStatus.DELETED ORDER BY e.receivedAt DESC")
     List<Email> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
 
-    // 수신함 목록 — 분석결과+카테고리 FETCH JOIN, 별도 countQuery로 페이징 정확성 보장
+    // 수신함 목록 — 분석결과+카테고리 FETCH JOIN, 별도 countQuery로 페이징 정확성 보장, DELETED 제외
     @Query(value = """
             SELECT e FROM Email e
             LEFT JOIN FETCH e.analysisResult ar
             LEFT JOIN FETCH ar.category
             WHERE e.user.userId = :userId
+            AND e.status != com.emailagent.domain.enums.EmailStatus.DELETED
             ORDER BY e.receivedAt DESC
             """,
-           countQuery = "SELECT COUNT(e) FROM Email e WHERE e.user.userId = :userId")
+           countQuery = "SELECT COUNT(e) FROM Email e WHERE e.user.userId = :userId AND e.status != com.emailagent.domain.enums.EmailStatus.DELETED")
     Page<Email> findInboxPage(@Param("userId") Long userId, Pageable pageable);
 
     @Query(value = """
