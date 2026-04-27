@@ -38,7 +38,6 @@ import java.util.*;
  *
  * 처리하는 Gmail History 이벤트 유형:
  * - messageAdded   : 신규 메일 수신 → 6단계 파싱 파이프라인 후 Email + Outbox(READY) 저장
- * - labelsAdded    : INBOX 라벨 복구(휴지통 → 받은편지함) → Email 상태를 PENDING_REVIEW로 복원
  * - labelsRemoved  : INBOX 라벨 제거(받은편지함 → 휴지통) → 소프트 삭제 (Email: DELETED, Outbox: CANCELLED)
  * - messagesDeleted: Gmail에서 영구 삭제 → 소프트 삭제 (동일)
  *
@@ -102,7 +101,7 @@ public class PubSubHandlerService {
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
                     .setStartHistoryId(BigInteger.valueOf(startHistoryId))
-                    .setHistoryTypes(List.of("messageAdded", "labelsAdded", "labelsRemoved", "messagesDeleted"))
+                    .setHistoryTypes(List.of("messageAdded", "labelsRemoved", "messagesDeleted"))
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
@@ -125,18 +124,7 @@ public class PubSubHandlerService {
                     }
                 }
 
-                // ② 라벨 추가 — INBOX 복구(휴지통 → 받은편지함) 시 이메일 상태 복원
-                if (history.getLabelsAdded() != null) {
-                    for (HistoryLabelAdded added : history.getLabelsAdded()) {
-                        // 【성능 필터】INBOX 라벨이 추가된 경우가 아니면 DB 조회 없이 즉시 건너뜀
-                        if (added.getLabelIds() == null || !added.getLabelIds().contains("INBOX")) {
-                            continue;
-                        }
-                        restoreEmail(gmailClient, added.getMessage().getId());
-                    }
-                }
-
-                // ③ 라벨 제거 — INBOX 이탈(받은편지함 → 휴지통) 시 소프트 삭제
+                // ② 라벨 제거 — INBOX 이탈(받은편지함 → 휴지통) 시 소프트 삭제
                 if (history.getLabelsRemoved() != null) {
                     for (HistoryLabelRemoved removed : history.getLabelsRemoved()) {
                         // 【성능 필터】INBOX 라벨이 제거된 경우가 아니면 DB 조회 없이 즉시 건너뜀
@@ -147,7 +135,7 @@ public class PubSubHandlerService {
                     }
                 }
 
-                // ④ 메시지 영구 삭제 — 소프트 삭제 (labelsRemoved와 공통 처리)
+                // ③ 메시지 영구 삭제 — 소프트 삭제 (labelsRemoved와 공통 처리)
                 if (history.getMessagesDeleted() != null) {
                     for (HistoryMessageDeleted deleted : history.getMessagesDeleted()) {
                         softDeleteEmail(deleted.getMessage().getId());
@@ -335,51 +323,6 @@ public class PubSubHandlerService {
 
             log.info("[PubSub] 이메일 소프트 삭제 완료 — messageId={}, cancelledOutbox={}건",
                     messageId, activeOutboxes.size());
-        });
-    }
-
-    /**
-     * 이메일 복구 — labelsAdded로 INBOX 라벨이 재추가될 때 호출.
-     *
-     * labelsAdded(INBOX)는 신규 메일 수신 시에도 동일하게 발생하기 때문에,
-     * startHistoryId가 과거를 가리키는 경우 메일이 처음 도착했을 때의 이벤트가 재처리되어
-     * 휴지통에 있는 DELETED 이메일이 잘못 PENDING_REVIEW로 복원되는 오류가 생길 수 있다.
-     * 이를 방지하기 위해 Gmail API로 현재 라벨을 확인한 뒤 실제로 INBOX에 있을 때만 복구한다.
-     */
-    private void restoreEmail(Gmail gmailClient, String messageId) {
-        emailRepository.findByExternalMsgId(messageId).ifPresent(email -> {
-            if (email.getStatus() != EmailStatus.DELETED) {
-                log.debug("[PubSub] 복구 대상 아님 — messageId={}, currentStatus={}", messageId, email.getStatus());
-                return;
-            }
-
-            // Gmail에서 현재 실제 라벨을 조회하여 INBOX에 있는지 검증
-            try {
-                Message current = gmailClient.users().messages()
-                        .get("me", messageId)
-                        .setFormat("minimal")
-                        .execute();
-                List<String> currentLabels = current.getLabelIds();
-                if (currentLabels == null || !currentLabels.contains("INBOX")) {
-                    // 현재 INBOX에 없으면 과거 이벤트 재처리로 판단하고 복구하지 않음
-                    log.debug("[PubSub] Gmail 검증: 현재 INBOX 없음, 복구 생략 — messageId={}", messageId);
-                    return;
-                }
-            } catch (GoogleJsonResponseException e) {
-                if (e.getStatusCode() == 404) {
-                    // Gmail에서 이미 영구 삭제된 경우 — DELETED 상태 유지
-                    log.debug("[PubSub] Gmail 검증: 메시지 없음(영구 삭제), 복구 생략 — messageId={}", messageId);
-                    return;
-                }
-                log.warn("[PubSub] Gmail 검증 중 오류, 복구 생략 — messageId={}, error={}", messageId, e.getMessage());
-                return;
-            } catch (Exception e) {
-                log.warn("[PubSub] Gmail 검증 중 오류, 복구 생략 — messageId={}, error={}", messageId, e.getMessage());
-                return;
-            }
-
-            email.updateStatus(EmailStatus.PENDING_REVIEW);
-            log.info("[PubSub] 이메일 복구 완료 (Gmail 현재 상태 검증 완료) — messageId={}", messageId);
         });
     }
 
