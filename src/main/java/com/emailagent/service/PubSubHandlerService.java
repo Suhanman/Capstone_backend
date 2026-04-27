@@ -132,7 +132,7 @@ public class PubSubHandlerService {
                         if (added.getLabelIds() == null || !added.getLabelIds().contains("INBOX")) {
                             continue;
                         }
-                        restoreEmail(added.getMessage().getId());
+                        restoreEmail(gmailClient, added.getMessage().getId());
                     }
                 }
 
@@ -340,18 +340,46 @@ public class PubSubHandlerService {
 
     /**
      * 이메일 복구 — labelsAdded로 INBOX 라벨이 재추가될 때 호출.
-     * DELETED 상태인 경우에만 PENDING_REVIEW로 복원하고, 그 외 상태는 무시하여 멱등성을 보장한다.
-     * 복구 시 이전 처리 상태(PROCESSED/AUTO_SENT)를 알 수 없으므로 PENDING_REVIEW로 초기화한다.
+     *
+     * labelsAdded(INBOX)는 신규 메일 수신 시에도 동일하게 발생하기 때문에,
+     * startHistoryId가 과거를 가리키는 경우 메일이 처음 도착했을 때의 이벤트가 재처리되어
+     * 휴지통에 있는 DELETED 이메일이 잘못 PENDING_REVIEW로 복원되는 오류가 생길 수 있다.
+     * 이를 방지하기 위해 Gmail API로 현재 라벨을 확인한 뒤 실제로 INBOX에 있을 때만 복구한다.
      */
-    private void restoreEmail(String messageId) {
+    private void restoreEmail(Gmail gmailClient, String messageId) {
         emailRepository.findByExternalMsgId(messageId).ifPresent(email -> {
             if (email.getStatus() != EmailStatus.DELETED) {
-                // DELETED가 아닌 상태에서 INBOX 라벨이 추가되는 정상 수신 흐름 등 — 무시
                 log.debug("[PubSub] 복구 대상 아님 — messageId={}, currentStatus={}", messageId, email.getStatus());
                 return;
             }
+
+            // Gmail에서 현재 실제 라벨을 조회하여 INBOX에 있는지 검증
+            try {
+                Message current = gmailClient.users().messages()
+                        .get("me", messageId)
+                        .setFormat("minimal")
+                        .execute();
+                List<String> currentLabels = current.getLabelIds();
+                if (currentLabels == null || !currentLabels.contains("INBOX")) {
+                    // 현재 INBOX에 없으면 과거 이벤트 재처리로 판단하고 복구하지 않음
+                    log.debug("[PubSub] Gmail 검증: 현재 INBOX 없음, 복구 생략 — messageId={}", messageId);
+                    return;
+                }
+            } catch (GoogleJsonResponseException e) {
+                if (e.getStatusCode() == 404) {
+                    // Gmail에서 이미 영구 삭제된 경우 — DELETED 상태 유지
+                    log.debug("[PubSub] Gmail 검증: 메시지 없음(영구 삭제), 복구 생략 — messageId={}", messageId);
+                    return;
+                }
+                log.warn("[PubSub] Gmail 검증 중 오류, 복구 생략 — messageId={}, error={}", messageId, e.getMessage());
+                return;
+            } catch (Exception e) {
+                log.warn("[PubSub] Gmail 검증 중 오류, 복구 생략 — messageId={}, error={}", messageId, e.getMessage());
+                return;
+            }
+
             email.updateStatus(EmailStatus.PENDING_REVIEW);
-            log.info("[PubSub] 이메일 복구 완료 — messageId={}", messageId);
+            log.info("[PubSub] 이메일 복구 완료 (Gmail 현재 상태 검증 완료) — messageId={}", messageId);
         });
     }
 
