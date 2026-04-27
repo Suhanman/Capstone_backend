@@ -81,9 +81,21 @@ public class Outbox {
         this.status = OutboxStatus.READY;
     }
 
-    /** FAILED 확정 — 재시도 한도 초과 시 Service에서 판단 후 호출 */
+    /** FAILED 확정 — AI 오류 또는 재시도 한도 초과 시 Service에서 판단 후 호출 */
     public void markAsFailed(String reason) {
         this.status = OutboxStatus.FAILED;
         this.failReason = reason;
+        this.finishedAt = LocalDateTime.now();
+    }
+
+    /**
+     * CANCELLED 확정 — 사용자가 Gmail에서 해당 이메일을 삭제한 경우 호출.
+     * FAILED(AI 오류)와 원인을 명확히 구분하여 관리자 로그 식별성을 확보한다.
+     * fail_reason 컬럼에 "DELETED_BY_USER" 등의 사유를 기록하여 추후 모니터링에 활용.
+     */
+    public void markAsCancelled(String reason) {
+        this.status = OutboxStatus.CANCELLED;
+        this.failReason = reason;
+        this.finishedAt = LocalDateTime.now();
     }
 }
