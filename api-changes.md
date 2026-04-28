@@ -625,3 +625,243 @@ ADD COLUMN user_count INT DEFAULT 0;
 - GET /api/admin/templates/summary 신규 추가
   응답: { total_templates, top_category, top_category_usage_count,
           active_rule_count, auto_send_rule_count }
+
+---
+
+## [2026-04-28] 비밀번호 재설정 API 변경 — 이메일 인증 코드 방식으로 전환
+
+### ⚠️ 삭제된 API
+
+| 메서드 | 경로 |
+|--------|------|
+| `POST` | `/api/auth/password-reset` |
+
+이름+이메일 입력 즉시 비밀번호를 변경하는 방식이 제거되었습니다.
+
+---
+
+### 신규 API — Step 1: 인증 코드 발송
+
+#### POST /api/auth/password-reset/code
+
+**인증**: 불필요 (JWT 없이 호출 가능)
+
+**요청**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `name` | string | ✅ | 가입 시 등록한 이름 |
+| `email` | string | ✅ | 가입 시 등록한 이메일 |
+
+```json
+{
+  "name": "홍길동",
+  "email": "hong@example.com"
+}
+```
+
+**성공 응답 (200)** — 이름·이메일이 일치하면 해당 이메일로 6자리 인증 코드 발송
+
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": ""
+}
+```
+
+**실패 응답**
+
+| 상황 | result_code | result_req |
+|------|-------------|------------|
+| 이름/이메일 불일치 또는 비활성 계정 | 400 | 이름 또는 이메일이 올바르지 않습니다. |
+| 유효성 검사 실패 | 400 | 입력값이 올바르지 않습니다: ... |
+| Gmail SMTP 발송 실패 | 503 | 이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요. |
+
+> 보안상 이름과 이메일 중 어느 쪽이 틀렸는지 구분하지 않습니다.
+
+---
+
+### 신규 API — Step 2: 인증 코드 검증 및 비밀번호 재설정
+
+#### POST /api/auth/password-reset/verify
+
+**인증**: 불필요 (JWT 없이 호출 가능)
+
+**요청**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `email` | string | ✅ | Step 1에서 사용한 이메일 |
+| `code` | string | ✅ | 수신한 6자리 인증 코드 |
+| `new_password` | string | ✅ | 새 비밀번호 (8자 이상) |
+
+```json
+{
+  "email": "hong@example.com",
+  "code": "483920",
+  "new_password": "newpassword123"
+}
+```
+
+**성공 응답 (200)**
+
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": ""
+}
+```
+
+**실패 응답**
+
+| 상황 | result_code | result_req |
+|------|-------------|------------|
+| 코드 미발송 또는 만료 (5분 초과) | 400 | 인증 코드가 존재하지 않습니다. 다시 요청해 주세요. / 인증 코드가 만료되었습니다. 다시 요청해 주세요. |
+| 코드 불일치 | 400 | 인증 코드가 올바르지 않습니다. |
+| 유효성 검사 실패 | 400 | 입력값이 올바르지 않습니다: ... |
+
+> 인증 코드는 검증 성공 즉시 삭제되어 재사용할 수 없습니다. 코드 유효 시간은 5분입니다.
+
+---
+
+### 프론트엔드 변경 플로우
+
+```
+1. 사용자가 이름 + 이메일 입력
+   → POST /api/auth/password-reset/code
+
+2. 이메일로 수신한 6자리 코드 + 새 비밀번호 입력
+   → POST /api/auth/password-reset/verify
+
+3. 성공 시 로그인 페이지로 이동
+```
+
+---
+
+## [2026-04-28] Google 회원가입 플로우 추가 및 Gmail 중복 방지
+
+### DB 변경
+
+```sql
+-- integrations.connected_email에 UNIQUE 제약 추가
+-- (Gmail 계정 하나 = 서비스 계정 하나 원칙 강제)
+-- ddl-auto: update 환경에서 서버 재시작 시 자동 반영
+ALTER TABLE integrations ADD UNIQUE KEY (connected_email);
+```
+
+> 기존 데이터 중 `connected_email` 중복 행이 있으면 서버 기동 실패. 운영 DB 적용 전 중복 여부 확인 필요.
+
+---
+
+### 신규 API — Google 회원가입 Step 1: OAuth URL 발급
+
+#### GET /api/auth/google/signup-url
+
+**인증**: 불필요 (비로그인 상태에서 호출)
+
+**응답 (200)**
+
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": "",
+  "authorization_url": "https://accounts.google.com/o/oauth2/..."
+}
+```
+
+프론트엔드는 `authorization_url`로 사용자를 이동시켜 Google 동의 화면을 표시합니다.
+
+---
+
+### 신규 API — Google 회원가입 Step 2: 비밀번호 입력 후 계정 생성
+
+#### POST /api/auth/google/signup
+
+**인증**: 불필요
+
+**요청**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `temp_token` | string | ✅ | OAuth 콜백 후 받은 임시 토큰 (유효 시간 10분) |
+| `password` | string | ✅ | 서비스 전용 비밀번호 (8자 이상) |
+
+```json
+{
+  "temp_token": "550e8400-e29b-41d4-a716-446655440000",
+  "password": "mypassword123"
+}
+```
+
+**성공 응답 (200)**
+
+```json
+{
+  "content_type": "application/json",
+  "success": true,
+  "result_code": 200,
+  "result_req": "",
+  "access_token": "<JWT>",
+  "token_type": "Bearer",
+  "expires_in": 86400
+}
+```
+
+**실패 응답**
+
+| 상황 | result_code | result_req |
+|------|-------------|------------|
+| temp_token 만료 또는 없음 | 400 | 회원가입 세션이 만료되었습니다. 다시 시도해 주세요. |
+| 이미 가입된 이메일 | 400 | 이미 가입된 이메일입니다. |
+| 유효성 검사 실패 | 400 | 입력값이 올바르지 않습니다: ... |
+
+---
+
+### 변경된 API — GET /api/integrations/google/callback (OAuth 콜백)
+
+기존에는 로그인한 유저의 Gmail 연동만 처리했으나, **회원가입 모드(SIGNUP)도 처리**하도록 확장되었습니다. 콜백 URL은 동일하며 state JWT의 mode 값으로 내부 분기합니다.
+
+#### 콜백 결과별 redirect URL
+
+| 상황 | redirect 대상 |
+|------|--------------|
+| 기존 로그인 유저 연동 완료 | `{frontendBaseUrl}/app/settings?tab=email&google_oauth=success&gmail_connected=true&calendar_connected=true/false` |
+| 기존 계정 자동 로그인 (Gmail 중복) | `{frontendBaseUrl}/app/dashboard?google_oauth=auto_login&token=<JWT>` |
+| 신규 유저 (비밀번호 입력 필요) | `{frontendBaseUrl}/auth/google/register?temp_token=...&email=...&name=...` |
+| 오류 발생 | `{frontendBaseUrl}/auth/google/register?error=true&message=...` (signup) 또는 `{frontendBaseUrl}/app/settings?tab=email&google_oauth=error&message=...` (연동) |
+
+---
+
+### 프론트엔드 구현 가이드
+
+#### Google 회원가입 플로우 (신규)
+
+```
+1. "구글로 시작하기" 버튼 클릭
+   → GET /api/auth/google/signup-url → authorization_url로 이동
+
+2. Google 동의 후 콜백
+   [신규 유저] → /auth/google/register?temp_token=...&email=...&name=...
+     - email, name은 read-only로 자동 채워줌
+     - 사용자가 비밀번호만 입력
+     → POST /api/auth/google/signup { temp_token, password }
+     → 성공 시 JWT 수령 후 로그인 상태 진입
+
+   [기존 계정] → /app/dashboard?google_oauth=auto_login&token=<JWT>
+     - token을 저장하여 자동 로그인 처리
+
+3. temp_token 유효 시간: 10분
+```
+
+#### 환경 변수 (선택 — 기본값 있음)
+
+| 환경 변수 | 기본값 | 설명 |
+|----------|--------|------|
+| `APP_FRONTEND_SIGNUP_SUCCESS_PATH` | `/app/dashboard` | 자동 로그인 후 redirect 경로 |
+| `APP_FRONTEND_SIGNUP_REGISTER_PATH` | `/auth/google/register` | 신규 유저 회원가입 페이지 경로 |
