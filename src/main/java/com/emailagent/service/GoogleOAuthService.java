@@ -197,10 +197,10 @@ public class GoogleOAuthService {
      * SIGNUP 모드 — 비로그인 유저의 Google 회원가입 처리.
      *
      * [Case 1] Gmail이 Integrations에 이미 존재
-     *   → 완전히 가입+연동된 계정. OAuth 토큰 갱신 + 자동 로그인.
+     *   → 이미 가입된 계정이므로 회원가입 중단.
      *
      * [Case 2] Gmail이 Users에만 존재 (일반 가입, 미연동)
-     *   → Integration 생성 + 자동 로그인.
+     *   → 이미 가입된 계정이므로 회원가입 중단.
      *
      * [Case 3] Gmail이 어디에도 없음 (신규)
      *   → OAuth 데이터 임시 저장, 프론트 회원가입 페이지로 redirect.
@@ -222,45 +222,21 @@ public class GoogleOAuthService {
         String externalAccountId = payload.getSubject();
         LocalDateTime tokenExpiresAt = LocalDateTime.now().plusSeconds(tokenResponse.getExpiresInSeconds());
 
-        // Case 1: Integrations에 이미 연동된 Gmail → 토큰 갱신 후 자동 로그인
+        // 회원가입 경로에서는 기존 계정을 자동 로그인시키지 않는다.
         Optional<Integration> existingIntegration = integrationRepository.findByConnectedEmail(gmailAddress);
         if (existingIntegration.isPresent()) {
-            Integration integration = existingIntegration.get();
-            integration.updateTokens(
-                    tokenResponse.getAccessToken(), tokenResponse.getRefreshToken(),
-                    tokenExpiresAt, grantedScopesRaw, gmailAddress,
-                    externalAccountId, true, isCalendarConnected);
-            registerWatch(integration);
-            User user = integration.getUser();
-            String jwt = jwtTokenProvider.generateAccessToken(user.getUserId(), user.getEmail());
-            log.info("[Google 회원가입] 기존 계정 자동 로그인: userId={}, email={}", user.getUserId(), gmailAddress);
-            return OAuthCallbackResult.autoLogin(jwt, jwtExpiration);
+            log.info("[Google 회원가입] 이미 연동된 계정으로 회원가입 시도: email={}", gmailAddress);
+            throw new IllegalStateException("이미 가입된 회원입니다. 로그인 화면에서 로그인해 주세요.");
         }
 
-        // Case 2: Users에만 있음 (일반 가입자) → Integration 연결 후 자동 로그인
+        // Case 2: Users에만 있음 (일반 가입자) → 회원가입 중단
         Optional<User> existingUser = userRepository.findByEmail(gmailAddress);
         if (existingUser.isPresent()) {
-            User user = existingUser.get();
-            if (!user.isActive()) {
+            if (!existingUser.get().isActive()) {
                 throw new IllegalStateException("비활성화된 계정입니다.");
             }
-            Integration integration = integrationRepository.save(Integration.builder()
-                    .user(user)
-                    .connectedEmail(gmailAddress)
-                    .externalAccountId(externalAccountId)
-                    .accessToken(tokenResponse.getAccessToken())
-                    .refreshToken(tokenResponse.getRefreshToken())
-                    .tokenExpiresAt(tokenExpiresAt)
-                    .grantedScopes(grantedScopesRaw)
-                    .isGmailConnected(true)
-                    .isCalendarConnected(isCalendarConnected)
-                    .syncStatus(SyncStatus.CONNECTED)
-                    .lastSyncedAt(LocalDateTime.now())
-                    .build());
-            registerWatch(integration);
-            String jwt = jwtTokenProvider.generateAccessToken(user.getUserId(), user.getEmail());
-            log.info("[Google 회원가입] 기존 계정에 Gmail 자동 연동: userId={}, email={}", user.getUserId(), gmailAddress);
-            return OAuthCallbackResult.autoLogin(jwt, jwtExpiration);
+            log.info("[Google 회원가입] 이미 가입된 이메일로 회원가입 시도: email={}", gmailAddress);
+            throw new IllegalStateException("이미 가입된 회원입니다. 로그인 화면에서 로그인해 주세요.");
         }
 
         // Case 3: 신규 유저 → OAuth 데이터 임시 저장 후 회원가입 페이지로
