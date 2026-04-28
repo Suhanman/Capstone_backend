@@ -27,17 +27,9 @@ public class IntegrationController {
     @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
 
-    // 기존 Gmail 연동 완료 후 이동할 프론트 경로 (이미 ?tab=email 포함)
-    @Value("${app.frontend.email-integration-path:/app/settings?tab=email}")
-    private String emailIntegrationPath;
-
-    // 자동 로그인(기존 계정 Gmail 연동) 후 이동할 프론트 경로
-    @Value("${app.google.signup-success-path:/app/dashboard}")
-    private String signupSuccessPath;
-
-    // 신규 유저 비밀번호 입력 페이지 경로
-    @Value("${app.google.signup-register-path:/auth/google/register}")
-    private String signupRegisterPath;
+    // Google OAuth 팝업 종료를 담당하는 프론트 콜백 경로
+    @Value("${app.frontend.oauth-callback-path:/oauth/google/callback}")
+    private String oauthCallbackPath;
 
     @GetMapping("/google/authorization-url")
     public ResponseEntity<AuthorizationUrlResponse> getAuthorizationUrl(@CurrentUser Long userId) {
@@ -46,11 +38,7 @@ public class IntegrationController {
 
     /**
      * Google OAuth 콜백 공통 처리.
-     * state JWT의 mode로 INTEGRATION / SIGNUP 분기 후 각 프론트 경로로 redirect.
-     *
-     * INTEGRATION_DONE  → /app/settings?tab=email&google_oauth=success&...
-     * AUTO_LOGIN        → /app/dashboard?google_oauth=auto_login&token=<JWT>
-     * PENDING_REGISTRATION → /auth/google/register?temp_token=...&email=...&name=...
+     * state JWT의 mode로 INTEGRATION / SIGNUP 분기 후 프론트 공통 콜백 경로로 redirect.
      */
     @GetMapping("/google/callback")
     public ResponseEntity<Void> handleCallback(
@@ -60,22 +48,23 @@ public class IntegrationController {
             OAuthCallbackResult result = googleOAuthService.handleCallback(code, state);
 
             String redirectUrl = switch (result.getType()) {
-                case INTEGRATION_DONE -> frontendBaseUrl
-                        + emailIntegrationPath
-                        + "&google_oauth=success"
-                        + "&gmail_connected=" + result.isGmailConnected()
-                        + "&calendar_connected=" + result.isCalendarConnected();
+                case INTEGRATION_DONE -> buildOAuthCallbackUrl(
+                        "google_oauth=success"
+                                + "&gmail_connected=" + result.isGmailConnected()
+                                + "&calendar_connected=" + result.isCalendarConnected()
+                );
 
-                case AUTO_LOGIN -> frontendBaseUrl
-                        + signupSuccessPath
-                        + "?google_oauth=auto_login"
-                        + "&token=" + URLEncoder.encode(result.getJwt(), StandardCharsets.UTF_8);
+                case AUTO_LOGIN -> buildOAuthCallbackUrl(
+                        "google_oauth=auto_login"
+                                + "&token=" + encode(result.getJwt())
+                );
 
-                case PENDING_REGISTRATION -> frontendBaseUrl
-                        + signupRegisterPath
-                        + "?temp_token=" + URLEncoder.encode(result.getTempToken(), StandardCharsets.UTF_8)
-                        + "&email=" + URLEncoder.encode(result.getEmail(), StandardCharsets.UTF_8)
-                        + "&name=" + URLEncoder.encode(result.getName() != null ? result.getName() : "", StandardCharsets.UTF_8);
+                case PENDING_REGISTRATION -> buildOAuthCallbackUrl(
+                        "google_oauth=pending_registration"
+                                + "&temp_token=" + encode(result.getTempToken())
+                                + "&email=" + encode(result.getEmail())
+                                + "&name=" + encode(result.getName())
+                );
             };
 
             return ResponseEntity.status(302)
@@ -93,14 +82,25 @@ public class IntegrationController {
                     e.getMessage() != null ? e.getMessage() : "Google OAuth 처리에 실패했습니다.",
                     StandardCharsets.UTF_8);
 
-            String errorRedirect = isSignupMode
-                    ? frontendBaseUrl + signupRegisterPath + "?error=true&message=" + message
-                    : frontendBaseUrl + emailIntegrationPath + "&google_oauth=error&message=" + message;
+            String errorRedirect = buildOAuthCallbackUrl(
+                    "google_oauth=error"
+                            + "&mode=" + (isSignupMode ? "signup" : "integration")
+                            + "&message=" + message
+            );
 
             return ResponseEntity.status(302)
                     .location(URI.create(errorRedirect))
                     .build();
         }
+    }
+
+    private String buildOAuthCallbackUrl(String queryString) {
+        String separator = oauthCallbackPath.contains("?") ? "&" : "?";
+        return frontendBaseUrl + oauthCallbackPath + separator + queryString;
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value != null ? value : "", StandardCharsets.UTF_8);
     }
 
     @GetMapping("/me")
