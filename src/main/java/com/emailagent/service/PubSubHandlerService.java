@@ -101,7 +101,7 @@ public class PubSubHandlerService {
             ListHistoryResponse historyResponse = gmailClient.users().history()
                     .list("me")
                     .setStartHistoryId(BigInteger.valueOf(startHistoryId))
-                    .setHistoryTypes(List.of("MESSAGE_ADDED", "LABELS_REMOVED", "MESSAGES_DELETED"))
+                    .setHistoryTypes(List.of("messageAdded", "labelRemoved", "messageDeleted"))
                     .execute();
 
             if (historyResponse.getHistory() == null || historyResponse.getHistory().isEmpty()) {
