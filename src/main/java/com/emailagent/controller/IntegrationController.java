@@ -29,14 +29,18 @@ public class IntegrationController {
     @Value("${app.frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
 
-    @Value("${app.frontend.email-integration-path:/app/settings?tab=email}")
-    private String emailIntegrationPath;
+    // Google OAuth 팝업 종료를 담당하는 프론트 콜백 경로
+    @Value("${app.frontend.oauth-callback-path:/oauth/google/callback}")
+    private String oauthCallbackPath;
 
     @GetMapping("/google/authorization-url")
     public ResponseEntity<AuthorizationUrlResponse> getAuthorizationUrl(@CurrentUser Long userId) {
         return ResponseEntity.ok(googleOAuthService.getAuthorizationUrl(userId));
     }
 
+    /**
+     * Google OAuth 콜백 공통 처리 후 프론트 콜백 경로로 리디렉션한다.
+     */
     @GetMapping("/google/callback")
     public ResponseEntity<Void> handleCallback(
             @RequestParam String code,
@@ -44,11 +48,11 @@ public class IntegrationController {
         try {
             CallbackResponse response = googleOAuthService.handleCallback(code, state);
 
-            String redirectUrl = frontendBaseUrl
-                    + emailIntegrationPath
-                    + "&google_oauth=success"
-                    + "&gmail_connected=" + response.isGmailConnected()
-                    + "&calendar_connected=" + response.isCalendarConnected();
+            String redirectUrl = buildOAuthCallbackUrl(
+                    "google_oauth=success"
+                            + "&gmail_connected=" + response.isGmailConnected()
+                            + "&calendar_connected=" + response.isCalendarConnected()
+            );
 
             return ResponseEntity.status(302)
                     .location(URI.create(redirectUrl))
@@ -59,15 +63,20 @@ public class IntegrationController {
                     StandardCharsets.UTF_8
             );
 
-            String redirectUrl = frontendBaseUrl
-                    + emailIntegrationPath
-                    + "&google_oauth=error"
-                    + "&message=" + message;
+            String redirectUrl = buildOAuthCallbackUrl(
+                    "google_oauth=error"
+                            + "&message=" + message
+            );
 
             return ResponseEntity.status(302)
                     .location(URI.create(redirectUrl))
                     .build();
         }
+    }
+
+    private String buildOAuthCallbackUrl(String queryString) {
+        String separator = oauthCallbackPath.contains("?") ? "&" : "?";
+        return frontendBaseUrl + oauthCallbackPath + separator + queryString;
     }
 
     @GetMapping("/me")
