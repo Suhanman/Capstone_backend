@@ -30,7 +30,7 @@ public class Integration {
     @Builder.Default
     private String provider = "GOOGLE";
 
-    @Column(name = "connected_email", nullable = false, length = 255)
+    @Column(name = "connected_email", nullable = false, length = 255, unique = true)
     private String connectedEmail;
 
     @Column(name = "external_account_id", length = 255)
