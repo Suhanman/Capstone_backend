@@ -36,7 +36,7 @@ public class AuthController {
 
     /**
      * Nginx Ingress가 주입하는 X-Real-IP를 우선 사용.
-     * 없을 경우 X-Forwarded-For 첫 번째 값, 최후 수단으로 RemoteAddr 사용.
+     * 없을 경우 X-Forwarded-For 첫 번째 값, 최후 수단으로 RemoteAddr 사용한다.
      */
     private String extractClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Real-IP");
