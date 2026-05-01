@@ -41,6 +41,12 @@ public class GlobalExceptionHandler {
                 .body(new BaseResponse(HttpStatus.UNAUTHORIZED.value(), e.getMessage()));
     }
 
+    @ExceptionHandler(AdminIpDeniedException.class)
+    public ResponseEntity<BaseResponse> handleAdminIpDenied(AdminIpDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new BaseResponse(HttpStatus.FORBIDDEN.value(), e.getMessage()));
+    }
+
     @ExceptionHandler(InsufficientScopeException.class)
     public ResponseEntity<BaseResponse> handleInsufficientScope(InsufficientScopeException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

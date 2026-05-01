@@ -8,6 +8,7 @@ import com.emailagent.dto.response.auth.TokenLoginResponse;
 import com.emailagent.security.CurrentUser;
 import com.emailagent.service.AuthService;
 import com.emailagent.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +24,26 @@ public class AuthController {
 
     /** POST /api/auth/tokens — 로그인, JWT Access Token 발급 */
     @PostMapping("/tokens")
-    public ResponseEntity<TokenLoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<TokenLoginResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        String clientIp = extractClientIp(httpRequest);
+        return ResponseEntity.ok(authService.login(request, clientIp));
+    }
+
+    /**
+     * Nginx Ingress가 주입하는 X-Real-IP를 우선 사용.
+     * 없을 경우 X-Forwarded-For 첫 번째 값, 최후 수단으로 RemoteAddr 사용.
+     */
+    private String extractClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Real-IP");
+        if (ip == null || ip.isBlank()) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            ip = (forwarded != null && !forwarded.isBlank())
+                    ? forwarded.split(",")[0].trim()
+                    : request.getRemoteAddr();
+        }
+        return ip;
     }
 
     /** GET /api/auth/me — 현재 인증된 사용자 확인 */
