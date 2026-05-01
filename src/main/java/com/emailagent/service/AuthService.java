@@ -65,7 +65,7 @@ public class AuthService {
             throw new IllegalStateException("비활성화된 계정입니다.");
         }
 
-        validateAdminIp(user, clientIp);
+        // validateAdminIp(user, clientIp); // TODO: pfSense DNS Split Horizon 설정 완료 후 활성화
 
         user.updateLastLogin();
 
