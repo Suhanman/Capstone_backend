@@ -13,6 +13,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.emailagent.service.GoogleOAuthService;
+import com.emailagent.service.PasswordResetService;
+
 
 @RestController
 @RequestMapping("/api/auth")
