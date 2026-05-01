@@ -21,8 +21,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -38,6 +38,8 @@ public class RagResultService {
     private final BusinessProfileRepository profileRepository;
     private final EmailRepository emailRepository;
     private final EmailTemplateRecommendationRepository recommendationRepository;
+    private final TemplateNumberService templateNumberService;
+    private final RagTemplateIndexService ragTemplateIndexService;
     private final RagPublisher ragPublisher;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -77,6 +79,13 @@ public class RagResultService {
 
         publishTemplateIndex(savedTemplates, category, items);
 
+        // 같은 category_name을 공유하는 모든 템플릿의 user_count 갱신
+        templateRepository.findUserCountPerTemplate().forEach(row -> {
+            Long templateId = ((Number) row[0]).longValue();
+            int count = ((Number) row[1]).intValue();
+            templateRepository.findById(templateId).ifPresent(t -> t.updateUserCount(count));
+        });
+
         log.info(
                 "[RagResultService] draft 결과로 템플릿 저장 완료 — userId={}, categoryId={}, count={}",
                 userId,
@@ -98,6 +107,7 @@ public class RagResultService {
                     return existing;
                 })
                 .orElseGet(() -> Template.builder()
+                        .userTemplateNo(templateNumberService.nextUserTemplateNo(userId))
                         .user(category.getUser())
                         .category(category)
                         .title(item.getTitle())
@@ -137,7 +147,7 @@ public class RagResultService {
                                     RagTemplateIndexRequestDTO.Metadata.builder()
                                             .templatePurpose(templatePurpose)
                                             .searchSummary(variantLabel + " 템플릿")
-                                            .semanticKeywords(List.of(category.getCategoryName(), variantLabel))
+                                            .semanticKeywords(ragTemplateIndexService.toSemanticKeywords(category, variantLabel))
                                             .recommendedSituations(templatePurpose != null ? List.of(templatePurpose) : List.of())
                                             .build()
                             )

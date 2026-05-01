@@ -9,7 +9,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "templates")
+@Table(
+        name = "templates",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_templates_user_template_no",
+                        columnNames = {"user_id", "user_template_no"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -20,6 +28,9 @@ public class Template {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "template_id")
     private Long templateId;
+
+    @Column(name = "user_template_no")
+    private Long userTemplateNo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -67,8 +78,23 @@ public class Template {
         this.bodyTemplate = bodyTemplate;
     }
 
+    public void incrementUseCount() {
+        this.useCount = (this.useCount == null ? 0 : this.useCount) + 1;
+    }
+
+    public void updateUserCount(int count) {
+        this.userCount = count;
+    }
+
     public void updateAccuracyScore(BigDecimal score) {
         this.accuracyScore = score;
+    }
+
+    public void assignUserTemplateNo(Long userTemplateNo) {
+        if (this.userTemplateNo != null) {
+            return;
+        }
+        this.userTemplateNo = userTemplateNo;
     }
 
     public String getQuality() {

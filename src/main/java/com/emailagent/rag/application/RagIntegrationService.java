@@ -3,6 +3,7 @@ package com.emailagent.rag.application;
 import com.emailagent.domain.entity.BusinessFaq;
 import com.emailagent.domain.entity.BusinessResource;
 import com.emailagent.domain.entity.Category;
+import com.emailagent.domain.entity.CategoryKeywordRule;
 import com.emailagent.domain.entity.Email;
 import com.emailagent.domain.entity.EmailAnalysisResult;
 import com.emailagent.dto.request.onboarding.InitialTemplateGenerateRequest;
@@ -10,6 +11,7 @@ import com.emailagent.rabbitmq.dto.RagDraftGenerateRequestDTO;
 import com.emailagent.rabbitmq.dto.RagKnowledgeIngestRequestDTO;
 import com.emailagent.rabbitmq.dto.RagTemplateMatchRequestDTO;
 import com.emailagent.rabbitmq.publisher.RagPublisher;
+import com.emailagent.repository.CategoryKeywordRuleRepository;
 import com.emailagent.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ public class RagIntegrationService {
 
     private final RagPublisher ragPublisher;
     private final S3Service s3Service;
+    private final CategoryKeywordRuleRepository keywordRuleRepository;
 
     public String requestKnowledgeIngest(
             Long userId,
@@ -134,7 +137,7 @@ public class RagIntegrationService {
                 .mode("generate")
                 .categoryId(category.getCategoryId())
                 .categoryName(category.getCategoryName())
-                .categoryKeywords(category.getKeywords())
+                .categoryKeywords(resolveCategoryKeywords(category.getCategoryName()))
                 .industryType(request.getIndustryType())
                 .emailTone(request.getEmailTone())
                 .companyDescription(request.getCompanyDescription())
@@ -153,5 +156,11 @@ public class RagIntegrationService {
                 requestId
         );
         return jobId;
+    }
+
+    private List<String> resolveCategoryKeywords(String categoryName) {
+        return keywordRuleRepository.findByCategoryName(categoryName)
+                .map(CategoryKeywordRule::getKeywords)
+                .orElse(List.of());
     }
 }

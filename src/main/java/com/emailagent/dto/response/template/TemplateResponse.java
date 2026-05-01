@@ -16,6 +16,9 @@ public class TemplateResponse extends BaseResponse {
     @JsonProperty("template_id")
     private Long templateId;
 
+    @JsonProperty("user_template_no")
+    private Long userTemplateNo;
+
     @JsonProperty("category_id")
     private Long categoryId;
 
@@ -42,6 +45,7 @@ public class TemplateResponse extends BaseResponse {
     public static TemplateResponse from(Template template) {
         return TemplateResponse.builder()
                 .templateId(template.getTemplateId())
+                .userTemplateNo(template.getUserTemplateNo())
                 .categoryId(template.getCategory().getCategoryId())
                 .categoryName(template.getCategory().getCategoryName())
                 .title(template.getTitle())

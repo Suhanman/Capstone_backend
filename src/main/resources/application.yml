@@ -24,6 +24,18 @@ spring:
       max-file-size: ${APP_MULTIPART_MAX_FILE_SIZE:10MB}
       max-request-size: ${APP_MULTIPART_MAX_REQUEST_SIZE:10MB}
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 jwt:
   secret: ${JWT_SECRET:your-256-bit-secret-key-here-change-in-production}
   expiration: 86400000       # 24시간 (ms)
@@ -32,6 +44,9 @@ jwt:
 app:
   file:
     upload-dir: C:/dev/uploads   # 파일 업로드 저장 경로
+  frontend:
+    base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+    oauth-callback-path: ${APP_FRONTEND_OAUTH_CALLBACK_PATH:/oauth/google/callback}
   rabbitmq:
     exchange:
       app2ai: x.app2ai.direct
@@ -74,9 +89,6 @@ app:
     redirect-uri: ${GOOGLE_REDIRECT_URI}
     calendar-id: primary
     topic-name: ${GOOGLE_TOPIC_NAME}
-    frontend:
-      base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
-    email-integration-path: ${APP_FRONTEND_EMAIL_INTEGRATION_PATH:/app/settings?tab=email}
 
   kubernetes:
     namespace: ${K8S_NAMESPACE:job}

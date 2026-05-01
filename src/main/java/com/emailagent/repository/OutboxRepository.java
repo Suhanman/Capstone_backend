@@ -74,4 +74,7 @@ public interface OutboxRepository extends JpaRepository<Outbox, Long> {
 
     // 관리자 - 상태별 건수
     long countByStatus(OutboxStatus status);
+
+    // 이메일별 활성 Outbox 조회 — 소프트 삭제 시 READY/SENDING 항목을 CANCELLED 처리하기 위해 사용
+    List<Outbox> findByEmail_EmailIdAndStatusIn(Long emailId, List<OutboxStatus> statuses);
 }

@@ -4,6 +4,7 @@ import com.emailagent.dto.response.auth.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -83,6 +84,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<BaseResponse> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new BaseResponse(HttpStatus.BAD_REQUEST.value(), e.getMessage()));
+    }
+
+    @ExceptionHandler(MailException.class)
+    public ResponseEntity<BaseResponse> handleMail(MailException e) {
+        log.error("이메일 발송 실패", e);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new BaseResponse(HttpStatus.SERVICE_UNAVAILABLE.value(), "이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요."));
     }
 
     // Validation 오류 (@Valid) — 필드별 오류를 result_req에 합쳐서 반환
